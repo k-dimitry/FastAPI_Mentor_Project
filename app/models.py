@@ -1,4 +1,8 @@
-from sqlalchemy import Boolean, Column, DateTime, Integer, String, func
+import uuid
+from datetime import datetime
+
+from sqlalchemy import DateTime, String, Uuid, func
+from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
 
@@ -6,13 +10,15 @@ from app.database import Base
 class Task(Base):
     __tablename__ = 'tasks'
 
-    #uuid
-    id = Column(Integer, primary_key=True, index=True)
-    # ограничить по длине!
-    title = Column(String, nullable=False)
-    description = Column(String, nullable=True)
-    is_done = Column(Boolean, default=False)
-    created_at = Column(DateTime, server_default=func.now())
-    updated_at = Column(
-        DateTime, server_default=func.now(), onupdate=func.now()
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, primary_key=True, default=uuid.uuid4
+    )
+    title: Mapped[str] = mapped_column(String(50), unique=True)
+    description: Mapped[str | None] = mapped_column(String, nullable=True)
+    is_done: Mapped[bool] = mapped_column(default=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
