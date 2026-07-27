@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import uuid
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     DateTime,
@@ -12,6 +15,9 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database import Base
+
+if TYPE_CHECKING:
+    from users.models import User
 
 
 class Task(Base):
@@ -32,7 +38,8 @@ class Task(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey('users.id', ondelete='CASCADE')
     )
-    author: Mapped['User'] = relationship(back_populates='tasks')
+
+    author: Mapped['User'] = relationship('User', back_populates='tasks')
 
     __table_args__ = (
         UniqueConstraint('user_id', 'title', name='unique_user_task_title'),
