@@ -3,7 +3,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
 from tasks.models import Task
-from tasks.schemas import TaskOut, TaskUpdate
+
+from ..get_by_id.request import TaskOut
+from .request import TaskUpdate
 
 router = APIRouter()
 
@@ -23,5 +25,3 @@ async def update_task(
     await db.commit()
     await db.refresh(task)
     return task
-
-

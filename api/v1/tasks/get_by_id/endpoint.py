@@ -3,7 +3,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
 from tasks.models import Task
-from tasks.schemas import TaskOut
+
+from ..get_by_id.request import TaskOut
 
 router = APIRouter()
 
