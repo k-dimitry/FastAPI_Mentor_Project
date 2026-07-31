@@ -4,8 +4,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db
 from tasks.models import Task
 
-from ..create.request import TaskCreate
-from ..get_by_id.request import TaskOut
+from ..common_schemas import TaskOut
+from .request import TaskCreate
 
 router = APIRouter()
 

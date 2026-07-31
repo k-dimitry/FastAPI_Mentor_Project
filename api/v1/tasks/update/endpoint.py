@@ -1,10 +1,12 @@
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
 from tasks.models import Task
 
-from ..get_by_id.request import TaskOut
+from ..common_schemas import TaskOut
 from .request import TaskUpdate
 
 router = APIRouter()
@@ -12,7 +14,7 @@ router = APIRouter()
 
 @router.put('/{task_id}', response_model=TaskOut)
 async def update_task(
-    task_id: int, task_data: TaskUpdate, db: AsyncSession = Depends(get_db)
+    task_id: UUID, task_data: TaskUpdate, db: AsyncSession = Depends(get_db)
 ):
     task = await db.get(Task, task_id)
     if not task:
