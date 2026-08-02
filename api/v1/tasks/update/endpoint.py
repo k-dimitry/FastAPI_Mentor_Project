@@ -1,29 +1,29 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from database import get_db
-from tasks.models import Task
+from tasks.dto import TaskUpdateDTO
+from tasks.services import TaskService
 
 from ..common_schemas import TaskOut
-from .request import TaskUpdate
+from ..dependencies import get_task_service
+from ..update.request import TaskUpdate
 
 router = APIRouter()
 
 
 @router.put('/{task_id}', response_model=TaskOut)
 async def update_task(
-    task_id: UUID, task_data: TaskUpdate, db: AsyncSession = Depends(get_db)
+    task_id: UUID,
+    task_data: TaskUpdate,
+    service: TaskService = Depends(get_task_service),
 ):
-    task = await db.get(Task, task_id)
-    if not task:
+    update_dto = TaskUpdateDTO(
+        title=task_data.title,
+        description=task_data.description,
+        is_done=task_data.is_done,
+    )
+    result_dto = await service.update_task(task_id, update_dto)
+    if result_dto is None:
         raise HTTPException(status_code=404, detail='Task not found')
-
-    # Обновляем только переданные поля
-    for key, value in task_data.model_dump(exclude_unset=True).items():
-        setattr(task, key, value)
-
-    await db.commit()
-    await db.refresh(task)
-    return task
+    return TaskOut.model_validate(result_dto.__dict__)

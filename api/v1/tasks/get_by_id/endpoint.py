@@ -1,19 +1,21 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from database import get_db
-from tasks.models import Task
+from tasks.services import TaskService
 
 from ..common_schemas import TaskOut
+from ..dependencies import get_task_service
 
 router = APIRouter()
 
 
 @router.get('/{task_id}', response_model=TaskOut)
-async def get_task(task_id: UUID, db: AsyncSession = Depends(get_db)):
-    task = await db.get(Task, task_id)
-    if not task:
+async def get_task(
+    task_id: UUID,
+    service: TaskService = Depends(get_task_service),
+):
+    task_dto = await service.get_task(task_id)
+    if task_dto is None:
         raise HTTPException(status_code=404, detail='Task not found')
-    return task
+    return TaskOut.model_validate(task_dto.__dict__)

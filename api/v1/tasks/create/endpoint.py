@@ -1,21 +1,30 @@
-from fastapi import APIRouter, Depends
-from sqlalchemy.ext.asyncio import AsyncSession
+from uuid import uuid4
 
-from database import get_db
-from tasks.models import Task
+from fastapi import APIRouter, Depends
+
+from tasks.dto import TaskCreateDTO
+from tasks.services import TaskService
 
 from ..common_schemas import TaskOut
-from .request import TaskCreate
+from ..create.request import TaskCreate
+from ..dependencies import get_task_service
 
 router = APIRouter()
 
 
 @router.post('/', response_model=TaskOut, status_code=201)
 async def create_task(
-    task_data: TaskCreate, db: AsyncSession = Depends(get_db)
+    task_data: TaskCreate,
+    service: TaskService = Depends(get_task_service),
 ):
-    new_task = Task(**task_data.model_dump())
-    db.add(new_task)
-    await db.commit()
-    await db.refresh(new_task)
-    return new_task
+
+    create_dto = TaskCreateDTO(
+        title=task_data.title,
+        description=task_data.description,
+    )
+
+    result_dto = await service.create_task(
+        create_dto,
+        user_id=uuid4(),
+    )
+    return TaskOut.model_validate(result_dto.__dict__)

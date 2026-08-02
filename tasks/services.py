@@ -26,10 +26,9 @@ class TaskService:
     async def create_task(
         self,
         dto: TaskCreateDTO,
-        user_id: UUID | None = None,  # Временно, пока нет авторизации
+        user_id: UUID | None = None,
     ) -> TaskResponseDTO:
         """Create Task and return DTO."""
-        # Пока используем переданный user_id или генерируем заглушку
         owner = user_id or uuid4()
 
         new_task = Task(

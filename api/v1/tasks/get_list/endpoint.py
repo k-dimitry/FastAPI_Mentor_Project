@@ -1,17 +1,16 @@
 from fastapi import APIRouter, Depends
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
-from database import get_db
-from tasks.models import Task
+from tasks.services import TaskService
 
 from ..common_schemas import TaskOut
+from ..dependencies import get_task_service
 
 router = APIRouter()
 
 
 @router.get('/', response_model=list[TaskOut])
-async def get_tasks(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Task))
-    tasks = result.scalars().all()
-    return tasks
+async def get_tasks(
+    service: TaskService = Depends(get_task_service),
+):
+    dtos = await service.get_all_tasks()
+    return [TaskOut.model_validate(dto.__dict__) for dto in dtos]
