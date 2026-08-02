@@ -17,3 +17,11 @@ class TaskOut(TaskBase):
 
     class Config:
         from_attributes = True
+
+
+# For pagination
+class TaskListOut(BaseModel):
+    items: list[TaskOut]
+    total: int
+    page: int
+    size: int

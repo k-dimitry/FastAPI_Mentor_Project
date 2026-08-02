@@ -1,9 +1,9 @@
 from uuid import UUID, uuid4
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tasks.dto import TaskCreateDTO, TaskResponseDTO, TaskUpdateDTO
+from tasks.dto import TaskCreateDTO, TaskListDTO, TaskResponseDTO, TaskUpdateDTO
 from tasks.models import Task
 
 
@@ -48,11 +48,29 @@ class TaskService:
             return None
         return self._to_dto(task)
 
-    async def get_all_tasks(self) -> list[TaskResponseDTO]:
-        """Return list of all Tasks."""
-        result = await self.db.execute(select(Task))
+    async def get_all_tasks(
+        self,
+        page: int = 1,
+        size: int = 20,
+    ) -> TaskListDTO:
+        """Return list of all Tasks with pagination"""
+        total_query = select(func.count()).select_from(Task)
+        total_result = await self.db.execute(total_query)
+        total = total_result.scalar_one()
+
+        offset = (page - 1) * size
+        query = select(Task).offset(offset).limit(size)
+        result = await self.db.execute(query)
         tasks = result.scalars().all()
-        return [self._to_dto(t) for t in tasks]
+
+        items = [self._to_dto(t) for t in tasks]
+
+        return TaskListDTO(
+            items=items,
+            total=total,
+            page=page,
+            size=size,
+        )
 
     async def update_task(
         self,
