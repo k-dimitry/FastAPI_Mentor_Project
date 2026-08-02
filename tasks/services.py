@@ -1,10 +1,12 @@
 from uuid import UUID, uuid4
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tasks.dto import TaskCreateDTO, TaskListDTO, TaskResponseDTO, TaskUpdateDTO
-from tasks.models import Task
+from .dto import TaskCreateDTO, TaskListDTO, TaskResponseDTO, TaskUpdateDTO
+from .exceptions import TaskAlreadyExistsError
+from .models import Task
 
 
 class TaskService:
@@ -24,20 +26,24 @@ class TaskService:
         )
 
     async def create_task(
-        self,
-        dto: TaskCreateDTO,
-        user_id: UUID | None = None,
+        self, dto: TaskCreateDTO, user_id: UUID | None = None
     ) -> TaskResponseDTO:
         """Create Task and return DTO."""
-        owner = user_id or uuid4()
 
+        owner = user_id or uuid4()
         new_task = Task(
             title=dto.title,
             description=dto.description,
             user_id=owner,
         )
         self.db.add(new_task)
-        await self.db.commit()
+        try:
+            await self.db.commit()
+        except IntegrityError:
+            await self.db.rollback()
+            raise TaskAlreadyExistsError(
+                f"Task '{dto.title}' already exists for this user."
+            )
         await self.db.refresh(new_task)
         return self._to_dto(new_task)
 
