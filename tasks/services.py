@@ -1,6 +1,6 @@
 from uuid import UUID, uuid4
 
-from sqlalchemy import func, select
+from sqlalchemy import func, over, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -54,22 +54,24 @@ class TaskService:
             return None
         return self._to_dto(task)
 
-    async def get_all_tasks(
-        self,
-        page: int = 1,
-        size: int = 20,
-    ) -> TaskListDTO:
+    async def get_all_tasks(self, page: int = 1, size: int = 20) -> TaskListDTO:
         """Return list of all Tasks with pagination"""
-        total_query = select(func.count()).select_from(Task)
-        total_result = await self.db.execute(total_query)
-        total = total_result.scalar_one()
-
         offset = (page - 1) * size
-        query = select(Task).offset(offset).limit(size)
-        result = await self.db.execute(query)
-        tasks = result.scalars().all()
+        sub = (
+            select(Task, func.count().over().label('total'))
+            .order_by(Task.created_at)
+            .offset(offset)
+            .limit(size)
+        )
 
-        items = [self._to_dto(t) for t in tasks]
+        result = await self.db.execute(sub)
+        rows = result.all()
+        if not rows:
+            total = 0
+            items = []
+        else:
+            total = rows[0].total
+            items = [self._to_dto(row.Task) for row in rows]
 
         return TaskListDTO(
             items=items,
@@ -79,20 +81,18 @@ class TaskService:
         )
 
     async def update_task(
-        self,
-        task_id: UUID,
-        dto: TaskUpdateDTO,
+        self, task_id: UUID, dto: TaskUpdateDTO
     ) -> TaskResponseDTO | None:
         """Partially update Task and return updated DTO."""
         task = await self.db.get(Task, task_id)
         if not task:
             return None
 
-        if dto.title is not None:
+        if dto.title_is_set:
             task.title = dto.title
-        if dto.description is not None:
+        if dto.description_is_set:
             task.description = dto.description
-        if dto.is_done is not None:
+        if dto.is_done_is_set:
             task.is_done = dto.is_done
 
         await self.db.commit()

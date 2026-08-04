@@ -21,8 +21,7 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Устанавливаем URL из наших настроек
-config.set_main_option('sqlalchemy.url', settings.DATABASE_URL)
+config.set_main_option('sqlalchemy.url', str(settings.DATABASE_URL))
 
 target_metadata = Base.metadata
 

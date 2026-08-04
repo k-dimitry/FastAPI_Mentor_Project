@@ -28,10 +28,11 @@ class Task(TimestampMixin, Base):
     description: Mapped[str | None] = mapped_column(String, nullable=True)
     is_done: Mapped[bool] = mapped_column(default=False)
     user_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey('users.id', ondelete='CASCADE')
+        ForeignKey('users.id', ondelete='CASCADE'),
+        index=True,
     )
 
-    author: Mapped['User'] = relationship('User', back_populates='tasks')
+    user: Mapped['User'] = relationship('User', back_populates='tasks')
 
     __table_args__ = (
         UniqueConstraint('user_id', 'title', name='unique_user_task_title'),

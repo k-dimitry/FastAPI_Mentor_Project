@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from tasks.dto import TaskUpdateDTO
 from tasks.services import TaskService
@@ -12,7 +12,7 @@ from ..update.request import TaskUpdate
 router = APIRouter()
 
 
-@router.put('/{task_id}', response_model=TaskOut)
+@router.patch('/{task_id}', response_model=TaskOut)
 async def update_task(
     task_id: UUID,
     task_data: TaskUpdate,
@@ -25,5 +25,8 @@ async def update_task(
     )
     result_dto = await service.update_task(task_id, update_dto)
     if result_dto is None:
-        raise HTTPException(status_code=404, detail='Task not found')
-    return TaskOut.model_validate(result_dto.__dict__)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail='Task not found',
+        )
+    return TaskOut.from_dto(result_dto)

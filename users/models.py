@@ -27,4 +27,4 @@ class User(TimestampMixin, Base):
     birthdate: Mapped[date | None] = mapped_column(Date, nullable=True)
     # TODO: encrypted
     hashed_password: Mapped[str] = mapped_column(String(255))
-    tasks: Mapped[list['Task']] = relationship('Task', back_populates='author')
+    tasks: Mapped[list['Task']] = relationship('Task', back_populates='user')
