@@ -1,7 +1,7 @@
 from uuid import UUID
 
 import bcrypt
-from passlib.context import CryptContext
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -58,3 +58,20 @@ class UserService:
 
     def verify_password(self, plain: str, hashed: str) -> bool:
         return bcrypt.checkpw(plain.encode(), hashed.encode())
+
+    async def authenticate_user(
+        self, username_or_email: str, password: str
+    ) -> UserResponseDTO | None:
+        """Проверяет учётные данные и возвращает DTO пользователя или None."""
+        # Ищем по username или email
+        query = select(User).where(
+            (User.username == username_or_email)
+            | (User.email == username_or_email)
+        )
+        result = await self.db.execute(query)
+        user = result.scalar_one_or_none()
+        if not user:
+            return None
+        if not self.verify_password(password, user.hashed_password):
+            return None
+        return self._to_dto(user)

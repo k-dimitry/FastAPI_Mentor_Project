@@ -1,10 +1,15 @@
-from pydantic import PostgresDsn
+from pydantic import PostgresDsn, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     DATABASE_URL: PostgresDsn
     DATABASE_ECHO: bool = False
+
+    # JWT
+    JWT_SECRET_KEY: SecretStr
+    JWT_ALGORITHM: str = 'HS256'
+    JWT_EXPIRE_MINUTES: int = 30
 
     model_config = SettingsConfigDict(
         env_file='.env',
