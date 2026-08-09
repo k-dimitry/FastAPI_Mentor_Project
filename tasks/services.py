@@ -1,6 +1,6 @@
-from uuid import UUID, uuid4
+from uuid import UUID
 
-from sqlalchemy import func, over, select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -26,11 +26,10 @@ class TaskService:
         )
 
     async def create_task(
-        self, dto: TaskCreateDTO, user_id: UUID | None = None
+        self, dto: TaskCreateDTO, user_id: UUID
     ) -> TaskResponseDTO:
         """Create Task and return DTO."""
-
-        owner = user_id or uuid4()
+        owner = user_id
         new_task = Task(
             title=dto.title,
             description=dto.description,
@@ -47,18 +46,24 @@ class TaskService:
         await self.db.refresh(new_task)
         return self._to_dto(new_task)
 
-    async def get_task(self, task_id: UUID) -> TaskResponseDTO | None:
-        """Return Task by id or None."""
+    async def get_task(
+        self, task_id: UUID, user_id: UUID
+    ) -> TaskResponseDTO | None:
+        """Возвращает задачу, только если она принадлежит пользователю."""
         task = await self.db.get(Task, task_id)
-        if not task:
+        if not task or task.user_id != user_id:
             return None
         return self._to_dto(task)
 
-    async def get_all_tasks(self, page: int = 1, size: int = 20) -> TaskListDTO:
-        """Return list of all Tasks with pagination"""
+    async def get_all_tasks(
+        self, user_id: UUID, page: int = 1, size: int = 20
+    ) -> TaskListDTO:
+        """Список задач только конкретного пользователя."""
+
         offset = (page - 1) * size
         sub = (
             select(Task, func.count().over().label('total'))
+            .where(Task.user_id == user_id)
             .order_by(Task.created_at)
             .offset(offset)
             .limit(size)
@@ -67,25 +72,17 @@ class TaskService:
         result = await self.db.execute(sub)
         rows = result.all()
         if not rows:
-            total = 0
-            items = []
-        else:
-            total = rows[0].total
-            items = [self._to_dto(row.Task) for row in rows]
-
-        return TaskListDTO(
-            items=items,
-            total=total,
-            page=page,
-            size=size,
-        )
+            return TaskListDTO(items=[], total=0, page=page, size=size)
+        total = rows[0].total
+        items = [self._to_dto(row.Task) for row in rows]
+        return TaskListDTO(items=items, total=total, page=page, size=size)
 
     async def update_task(
-        self, task_id: UUID, dto: TaskUpdateDTO
+        self, task_id: UUID, dto: TaskUpdateDTO, user_id: UUID
     ) -> TaskResponseDTO | None:
-        """Partially update Task and return updated DTO."""
+        """Обновляет задачу, если принадлежит пользователю, иначе None."""
         task = await self.db.get(Task, task_id)
-        if not task:
+        if not task or task.user_id != user_id:
             return None
 
         if dto.title_is_set:
@@ -99,10 +96,10 @@ class TaskService:
         await self.db.refresh(task)
         return self._to_dto(task)
 
-    async def delete_task(self, task_id: UUID) -> bool:
-        """Delete Task. Return True, if done, else False."""
+    async def delete_task(self, task_id: UUID, user_id: UUID) -> bool:
+        """Удаляет задачу, только если принадлежит пользователю."""
         task = await self.db.get(Task, task_id)
-        if not task:
+        if not task or task.user_id != user_id:
             return False
         await self.db.delete(task)
         await self.db.commit()
