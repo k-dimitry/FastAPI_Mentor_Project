@@ -23,7 +23,7 @@ async def register(
         email=data.email,
         first_name=data.first_name,
         last_name=data.last_name,
-        password=data.password,
+        password=data.password.get_secret_value(),
         birthdate=data.birthdate,
     )
     user_dto = await service.create_user(create_dto)
