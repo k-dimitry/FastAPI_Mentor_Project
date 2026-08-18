@@ -4,7 +4,7 @@ import uuid
 from datetime import date
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Date, String, Uuid
+from sqlalchemy import Date, String, Uuid, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from common.mixins import TimestampMixin
@@ -25,6 +25,9 @@ class User(TimestampMixin, Base):
     first_name: Mapped[str] = mapped_column(String(50))
     last_name: Mapped[str] = mapped_column(String(50))
     birthdate: Mapped[date | None] = mapped_column(Date, nullable=True)
-    # TODO: encrypted
     hashed_password: Mapped[str] = mapped_column(String(255))
     tasks: Mapped[list['Task']] = relationship('Task', back_populates='user')
+    is_admin: Mapped[bool] = mapped_column(
+        default=False,
+        server_default=text('false'),
+    )

@@ -16,16 +16,16 @@ class UserBase(BaseModel):
     birthdate: date | None = None
 
 
-class UserOut(UserBase):
+class UserResponse(UserBase):
     id: UUID
     created_at: datetime
     updated_at: datetime
+    is_admin: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 
     @classmethod
-    def from_dto(cls, dto: 'UserResponseDTO') -> 'UserOut':
-        from users.dto import UserResponseDTO
+    def from_dto(cls, dto: 'UserResponseDTO') -> 'UserResponse':
 
         return cls(
             id=dto.id,
@@ -36,4 +36,5 @@ class UserOut(UserBase):
             birthdate=dto.birthdate,
             created_at=dto.created_at,
             updated_at=dto.updated_at,
+            is_admin=dto.is_admin,
         )

@@ -1,2 +1,5 @@
-class UserAlreadyExistsError(Exception):
+from common.exceptions import AlreadyExistsError
+
+
+class UserAlreadyExistsError(AlreadyExistsError):
     pass

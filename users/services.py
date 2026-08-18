@@ -25,6 +25,7 @@ class UserService:
             birthdate=user.birthdate,
             created_at=user.created_at,
             updated_at=user.updated_at,
+            is_admin=user.is_admin,
         )
 
     async def create_user(self, dto: UserCreateDTO) -> UserResponseDTO:

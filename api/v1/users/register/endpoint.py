@@ -1,18 +1,18 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 
+from api.v1.users.common_schemas import UserResponse
+from api.v1.users.dependencies import get_user_service
+from api.v1.users.register.request import UserRegisterRequest
 from users.dto import UserCreateDTO
-from users.exceptions import UserAlreadyExistsError
 from users.services import UserService
-
-from ..common_schemas import UserOut
-from ..dependencies import get_user_service
-from .request import UserRegisterRequest
 
 router = APIRouter()
 
 
 @router.post(
-    '/register', response_model=UserOut, status_code=status.HTTP_201_CREATED
+    '/register',
+    response_model=UserResponse,
+    status_code=status.HTTP_201_CREATED,
 )
 async def register(
     data: UserRegisterRequest,
@@ -26,11 +26,5 @@ async def register(
         password=data.password,
         birthdate=data.birthdate,
     )
-    try:
-        user_dto = await service.create_user(create_dto)
-    except UserAlreadyExistsError:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail='Username or email already registered.',
-        )
-    return UserOut.from_dto(user_dto)
+    user_dto = await service.create_user(create_dto)
+    return UserResponse.from_dto(user_dto)

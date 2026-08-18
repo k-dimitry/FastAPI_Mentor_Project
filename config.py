@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     # JWT
     JWT_SECRET_KEY: SecretStr
     JWT_ALGORITHM: str = 'HS256'
-    JWT_EXPIRE_MINUTES: int = 30
+    JWT_EXPIRE_MINUTES: int = 120
 
     model_config = SettingsConfigDict(
         env_file='.env',

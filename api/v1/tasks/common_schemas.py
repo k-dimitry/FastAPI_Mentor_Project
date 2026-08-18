@@ -7,7 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class TaskBase(BaseModel):
     title: Annotated[str, Field(..., max_length=50)]
-    description: Annotated[str, Field(None, max_length=10_000)]
+    description: Annotated[str | None, Field(None, max_length=10_000)]
     is_done: bool = False
 
 
@@ -20,8 +20,6 @@ class TaskOut(TaskBase):
 
     @classmethod
     def from_dto(cls, dto: 'TaskResponseDTO') -> 'TaskOut':
-        # Import here to avoid cycle import
-        from tasks.dto import TaskResponseDTO
 
         return cls(
             id=dto.id,
