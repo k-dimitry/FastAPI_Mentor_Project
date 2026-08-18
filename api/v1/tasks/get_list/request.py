@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 
-from ..common_schemas import TaskOut
+from api.v1.tasks.common_schemas import TaskOut
 
 
 class TaskListOut(BaseModel):

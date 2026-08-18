@@ -5,9 +5,9 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .dto import UserCreateDTO, UserResponseDTO
-from .exceptions import UserAlreadyExistsError
-from .models import User
+from users.dto import UserCreateDTO, UserResponseDTO
+from users.exceptions import UserAlreadyExistsError
+from users.models import User
 
 
 class UserService:

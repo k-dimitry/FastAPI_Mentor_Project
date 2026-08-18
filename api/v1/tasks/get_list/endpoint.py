@@ -6,11 +6,10 @@ from fastapi.params import Query
 
 from api.v1.auth.dependencies import get_current_user
 from api.v1.tasks.dependencies import get_task_service
+from api.v1.tasks.get_list.query import GetListTaskQuery
+from api.v1.tasks.get_list.request import TaskListOut
 from tasks.services import TaskService
 from users.dto import UserResponseDTO
-
-from .query import GetListTaskQuery
-from .request import TaskListOut
 
 router = APIRouter()
 

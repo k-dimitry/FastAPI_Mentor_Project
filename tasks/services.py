@@ -4,9 +4,9 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .dto import TaskCreateDTO, TaskListDTO, TaskResponseDTO, TaskUpdateDTO
-from .exceptions import TaskAlreadyExistsError
-from .models import Task
+from tasks.dto import TaskCreateDTO, TaskListDTO, TaskResponseDTO, TaskUpdateDTO
+from tasks.exceptions import TaskAlreadyExistsError
+from tasks.models import Task
 
 
 class TaskService:

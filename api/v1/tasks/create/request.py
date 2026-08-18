@@ -1,4 +1,4 @@
-from ..common_schemas import TaskBase
+from api.v1.tasks.common_schemas import TaskBase
 
 
 class TaskCreate(TaskBase):

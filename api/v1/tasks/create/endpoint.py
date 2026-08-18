@@ -1,13 +1,12 @@
 from fastapi import APIRouter, Depends, status
 
 from api.v1.auth.dependencies import get_current_user
+from api.v1.tasks.common_schemas import TaskOut
+from api.v1.tasks.create.request import TaskCreate
+from api.v1.tasks.dependencies import get_task_service
 from tasks.dto import TaskCreateDTO
 from tasks.services import TaskService
 from users.dto import UserResponseDTO
-
-from ..common_schemas import TaskOut
-from ..create.request import TaskCreate
-from ..dependencies import get_task_service
 
 router = APIRouter()
 
