@@ -18,13 +18,5 @@ async def register(
     data: UserRegisterRequest,
     service: UserService = Depends(get_user_service),
 ):
-    create_dto = UserCreateDTO(
-        username=data.username,
-        email=data.email,
-        first_name=data.first_name,
-        last_name=data.last_name,
-        password=data.password.get_secret_value(),
-        birthdate=data.birthdate,
-    )
-    user_dto = await service.create_user(create_dto)
+    user_dto = await service.create_user(data.to_dto())
     return UserResponse.from_dto(user_dto)

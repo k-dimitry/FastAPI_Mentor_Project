@@ -2,10 +2,10 @@ from typing import Annotated
 
 from pydantic import BaseModel, Field
 
-from tasks.dto import _UNSET, TaskUpdateDTO
+from tasks.dto import UNSET, TaskUpdateDTO
 
 
-class TaskUpdate(BaseModel):
+class TaskUpdateRequest(BaseModel):
     title: Annotated[
         str,
         Field(
@@ -36,11 +36,4 @@ class TaskUpdate(BaseModel):
     ] = None
 
     def to_dto(self) -> TaskUpdateDTO:
-        provided = self.model_fields_set
-        return TaskUpdateDTO(
-            title=self.title if 'title' in provided else _UNSET,
-            description=self.description
-            if 'description' in provided
-            else _UNSET,
-            is_done=self.is_done if 'is_done' in provided else _UNSET,
-        )
+        return TaskUpdateDTO(**self.model_dump(exclude_unset=True))

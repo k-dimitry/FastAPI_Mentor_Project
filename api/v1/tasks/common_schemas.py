@@ -11,7 +11,7 @@ class TaskBase(BaseModel):
     is_done: bool = False
 
 
-class TaskOut(TaskBase):
+class TaskResponse(TaskBase):
     id: UUID
     created_at: datetime
     updated_at: datetime
@@ -19,7 +19,7 @@ class TaskOut(TaskBase):
     model_config = ConfigDict(from_attributes=True)
 
     @classmethod
-    def from_dto(cls, dto: 'TaskResponseDTO') -> 'TaskOut':
+    def from_dto(cls, dto: 'TaskResponseDTO') -> 'TaskResponse':
 
         return cls(
             id=dto.id,

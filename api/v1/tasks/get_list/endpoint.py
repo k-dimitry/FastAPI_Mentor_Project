@@ -1,5 +1,4 @@
 from typing import Annotated
-from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.params import Query
@@ -7,14 +6,15 @@ from fastapi.params import Query
 from api.v1.auth.dependencies import get_current_user
 from api.v1.tasks.dependencies import get_task_service
 from api.v1.tasks.get_list.query import GetListTaskQuery
-from api.v1.tasks.get_list.request import TaskListOut
+from api.v1.tasks.get_list.request import TaskListResponse
+from common.pagination import get_pagination_urls
 from tasks.services import TaskService
 from users.dto import UserResponseDTO
 
 router = APIRouter()
 
 
-@router.get('/', response_model=TaskListOut)
+@router.get('/', response_model=TaskListResponse)
 async def get_tasks(
     request: Request,
     params: Annotated[GetListTaskQuery, Query()],
@@ -25,22 +25,14 @@ async def get_tasks(
         user_id=current_user.id, page=params.page, size=params.size
     )
 
-    next_url = None
-    previous_url = None
+    next_url, previous_url = get_pagination_urls(
+        request=request,
+        page=params.page,
+        size=params.size,
+        total=result_dto.total,
+    )
 
-    if params.page * params.size < result_dto.total:
-        query_params = dict(request.query_params)
-        query_params['page'] = str(params.page + 1)
-        query_params['size'] = str(params.size)
-        next_url = str(request.url.replace(query=urlencode(query_params)))
-
-    if params.page > 1:
-        query_params = dict(request.query_params)
-        query_params['page'] = str(params.page - 1)
-        query_params['size'] = str(params.size)
-        previous_url = str(request.url.replace(query=urlencode(query_params)))
-
-    return TaskListOut.from_dto(
+    return TaskListResponse.from_dto(
         result_dto,
         next_url=next_url,
         previous_url=previous_url,

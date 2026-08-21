@@ -1,10 +1,10 @@
 from pydantic import BaseModel
 
-from api.v1.tasks.common_schemas import TaskOut
+from api.v1.tasks.common_schemas import TaskResponse
 
 
-class TaskListOut(BaseModel):
-    result: list[TaskOut]
+class TaskListResponse(BaseModel):
+    result: list[TaskResponse]
     count: int
     next: str | None
     previous: str | None
@@ -15,10 +15,10 @@ class TaskListOut(BaseModel):
         dto: 'TaskListDTO',
         next_url: str | None = None,
         previous_url: str | None = None,
-    ) -> 'TaskListOut':
+    ) -> 'TaskListResponse':
 
         return cls(
-            result=[TaskOut.from_dto(item) for item in dto.items],
+            result=[TaskResponse.from_dto(item) for item in dto.items],
             count=dto.total,
             next=next_url,
             previous=previous_url,

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 
 import tasks.models  # noqa
@@ -11,10 +11,8 @@ app.include_router(v1_router, prefix='/api')
 
 
 @app.exception_handler(AlreadyExistsError)
-async def already_exists_exception_handler(
-    request: Request, exc: AlreadyExistsError
-):
+async def already_exists_exception_handler(_: Request, exc: AlreadyExistsError):
     return JSONResponse(
-        status_code=409,
+        status_code=status.HTTP_409_CONFLICT,
         content={'detail': exc.message},
     )

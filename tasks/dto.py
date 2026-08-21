@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
-_UNSET = object()  # sentinel
+UNSET = object()  # sentinel
 
 
 @dataclass(slots=True, frozen=True)
@@ -23,21 +23,21 @@ class TaskCreateDTO:
 
 @dataclass(slots=True)
 class TaskUpdateDTO:
-    title: str | None | object = _UNSET
-    description: str | None | object = _UNSET
-    is_done: bool | None | object = _UNSET
+    title: str | None | object = UNSET
+    description: str | None | object = UNSET
+    is_done: bool | None | object = UNSET
 
     @property
     def title_is_set(self):
-        return self.title is not _UNSET
+        return self.title is not UNSET
 
     @property
     def description_is_set(self):
-        return self.description is not _UNSET
+        return self.description is not UNSET
 
     @property
     def is_done_is_set(self):
-        return self.is_done is not _UNSET
+        return self.is_done is not UNSET
 
 
 @dataclass(slots=True, frozen=True)
