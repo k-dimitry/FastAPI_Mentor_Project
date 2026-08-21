@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from uuid import UUID
 
 UNSET = object()  # sentinel
@@ -46,3 +46,23 @@ class TaskListDTO:
     total: int
     limit: int
     offset: int
+
+
+@dataclass(slots=True, frozen=True)
+class TaskStatsTotalDTO:
+    done_count: int
+    not_done_count: int
+    done_percent: float
+
+
+@dataclass(slots=True, frozen=True)
+class TaskStatsByDayItemDTO:
+    day: date
+    total_count: int
+    done_count: int
+    not_done_count: int
+
+
+@dataclass(slots=True, frozen=True)
+class TaskStatsByDayDTO:
+    items: list[TaskStatsByDayItemDTO]

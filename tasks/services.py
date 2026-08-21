@@ -1,11 +1,19 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import and_, asc, desc, func, or_, select
+from sqlalchemy import and_, asc, case, desc, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from tasks.dto import TaskCreateDTO, TaskListDTO, TaskResponseDTO, TaskUpdateDTO
+from tasks.dto import (
+    TaskCreateDTO,
+    TaskListDTO,
+    TaskResponseDTO,
+    TaskStatsByDayDTO,
+    TaskStatsByDayItemDTO,
+    TaskStatsTotalDTO,
+    TaskUpdateDTO,
+)
 from tasks.exceptions import TaskAlreadyExistsError
 from tasks.models import Task
 
@@ -142,3 +150,57 @@ class TaskService:
         await self.db.delete(task)
         await self.db.commit()
         return True
+
+    async def get_stats_total(self, user_id: UUID) -> TaskStatsTotalDTO:
+        """Возвращает статистику по выполненным/невыполненным задачам."""
+        stmt = select(
+            func.count(case((Task.is_done == True, 1))).label('done_count'),
+            func.count(case((Task.is_done == False, 1))).label(
+                'not_done_count'
+            ),
+        ).where(Task.user_id == user_id)
+
+        result = await self.db.execute(stmt)
+        row = result.one()
+        done = row.done_count or 0
+        not_done = row.not_done_count or 0
+        total = done + not_done
+        done_percent = round((done / total) * 100, 2) if total else 0.0
+
+        return TaskStatsTotalDTO(
+            done_count=done,
+            not_done_count=not_done,
+            done_percent=done_percent,
+        )
+
+    async def get_stats_by_day(self, user_id: UUID) -> TaskStatsByDayDTO:
+        """Возвращает статистику задач, сгруппированную по дням создания."""
+        stmt = (
+            select(
+                func.date(Task.created_at).label('day'),
+                func.count().label('total_count'),
+                func.sum(case((Task.is_done == True, 1), else_=0)).label(
+                    'done_count'
+                ),
+                func.sum(case((Task.is_done == False, 1), else_=0)).label(
+                    'not_done_count'
+                ),
+            )
+            .where(Task.user_id == user_id)
+            .group_by('day')
+            .order_by('day')
+        )
+
+        result = await self.db.execute(stmt)
+        rows = result.all()
+
+        items = [
+            TaskStatsByDayItemDTO(
+                day=row.day,
+                total_count=row.total_count,
+                done_count=row.done_count or 0,
+                not_done_count=row.not_done_count or 0,
+            )
+            for row in rows
+        ]
+        return TaskStatsByDayDTO(items=items)
