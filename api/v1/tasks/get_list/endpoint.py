@@ -22,13 +22,21 @@ async def get_tasks(
     current_user: UserResponseDTO = Depends(get_current_user),
 ):
     result_dto = await service.get_all_tasks(
-        user_id=current_user.id, page=params.page, size=params.size
+        user_id=current_user.id,
+        limit=params.limit,
+        offset=params.offset,
+        is_done=params.is_done,
+        created_from=params.created_from,
+        created_to=params.created_to,
+        query=params.query,
+        order_by=params.order_by,
+        direction=params.direction,
     )
 
     next_url, previous_url = get_pagination_urls(
         request=request,
-        page=params.page,
-        size=params.size,
+        offset=result_dto.offset,
+        limit=result_dto.limit,
         total=result_dto.total,
     )
 

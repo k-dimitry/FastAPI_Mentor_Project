@@ -1,6 +1,7 @@
+from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, asc, desc, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -55,27 +56,64 @@ class TaskService:
             return None
         return self._to_dto(task)
 
+    # updated method
     async def get_all_tasks(
-        self, user_id: UUID, page: int = 1, size: int = 20
+        self,
+        user_id: UUID,
+        *,
+        limit: int = 20,
+        offset: int = 0,
+        is_done: bool | None = None,
+        created_from: datetime | None = None,
+        created_to: datetime | None = None,
+        query: str | None = None,
+        order_by: str = 'created_at',
+        direction: str = 'desc',
     ) -> TaskListDTO:
-        """Список задач только конкретного пользователя."""
+        """Возвращает список задач с фильтрами,
+        поиском, сортировкой и пагинацией."""
+        conditions = [Task.user_id == user_id]
 
-        offset = (page - 1) * size
-        sub = (
-            select(Task, func.count().over().label('total'))
-            .where(Task.user_id == user_id)
-            .order_by(Task.created_at)
-            .offset(offset)
-            .limit(size)
+        if is_done is not None:
+            conditions.append(Task.is_done == is_done)
+        if created_from is not None:
+            conditions.append(Task.created_at >= created_from)
+        if created_to is not None:
+            conditions.append(Task.created_at <= created_to)
+        if query:
+            search = f'%{query}%'
+            conditions.append(
+                or_(
+                    Task.title.ilike(search),
+                    Task.description.ilike(search),
+                )
+            )
+
+        # Подзапрос с оконной функцией для подсчёта total
+        where_clause = and_(*conditions)
+        stmt = select(Task, func.count().over().label('total')).where(
+            where_clause
         )
 
-        result = await self.db.execute(sub)
+        # Сортировка
+        order_column = getattr(Task, order_by, Task.created_at)
+        if direction == 'asc':
+            stmt = stmt.order_by(asc(order_column))
+        else:
+            stmt = stmt.order_by(desc(order_column))
+
+        # Пагинация limit/offset
+        stmt = stmt.offset(offset).limit(limit)
+
+        result = await self.db.execute(stmt)
         rows = result.all()
+
         if not rows:
-            return TaskListDTO(items=[], total=0, page=page, size=size)
+            return TaskListDTO(items=[], total=0, limit=limit, offset=offset)
+
         total = rows[0].total
         items = [self._to_dto(row.Task) for row in rows]
-        return TaskListDTO(items=items, total=total, page=page, size=size)
+        return TaskListDTO(items=items, total=total, limit=limit, offset=offset)
 
     async def update_task(
         self, task_id: UUID, dto: TaskUpdateDTO, user_id: UUID

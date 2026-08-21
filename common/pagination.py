@@ -5,33 +5,34 @@ from fastapi import Request
 
 def get_pagination_urls(
     request: Request,
-    page: int,
-    size: int,
+    offset: int,
+    limit: int,
     total: int,
 ) -> tuple[str | None, str | None]:
     """
-    Возвращает URL-адреса для следующей и предыдущей страниц.
+    Возвращает URL-адреса для следующей и предыдущей страниц
+    на основе limit/offset.
 
-    :param request: Объект запроса FastAPI
-    для получения базового URL и параметров.
-    :param page: Текущая страница.
-    :param size: Количество элементов на странице.
+    :param request: Объект запроса FastAPI.
+    :param offset: Текущее смещение.
+    :param limit: Количество элементов на странице.
     :param total: Общее количество элементов.
-    :return: Кортеж (next_url, previous_url). Значение None, если страницы нет.
+    :return: Кортеж (next_url, previous_url). None, если страницы нет.
     """
     next_url = None
     previous_url = None
 
-    if page * size < total:
-        query_params = dict(request.query_params)
-        query_params['page'] = str(page + 1)
-        query_params['size'] = str(size)
-        next_url = str(request.url.replace(query=urlencode(query_params)))
+    if offset + limit < total:
+        params = dict(request.query_params)
+        params['offset'] = str(offset + limit)
+        params['limit'] = str(limit)
+        next_url = str(request.url.replace(query=urlencode(params)))
 
-    if page > 1:
-        query_params = dict(request.query_params)
-        query_params['page'] = str(page - 1)
-        query_params['size'] = str(size)
-        previous_url = str(request.url.replace(query=urlencode(query_params)))
+    if offset > 0:
+        params = dict(request.query_params)
+        new_offset = max(0, offset - limit)
+        params['offset'] = str(new_offset)
+        params['limit'] = str(limit)
+        previous_url = str(request.url.replace(query=urlencode(params)))
 
     return next_url, previous_url

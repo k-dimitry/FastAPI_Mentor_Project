@@ -44,5 +44,5 @@ class TaskUpdateDTO:
 class TaskListDTO:
     items: list[TaskResponseDTO]
     total: int
-    page: int
-    size: int
+    limit: int
+    offset: int
