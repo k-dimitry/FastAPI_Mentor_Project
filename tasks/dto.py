@@ -19,6 +19,7 @@ class TaskResponseDTO:
 class TaskCreateDTO:
     title: str
     description: str | None = None
+    is_done: bool = False
 
 
 @dataclass(slots=True)

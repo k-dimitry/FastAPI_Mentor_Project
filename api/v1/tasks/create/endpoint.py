@@ -11,7 +11,9 @@ from users.dto import UserResponseDTO
 router = APIRouter()
 
 
-@router.post('/', response_model=TaskResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    '/', response_model=TaskResponse, status_code=status.HTTP_201_CREATED
+)
 async def create_task(
     task_data: TaskCreate,
     service: TaskService = Depends(get_task_service),
@@ -20,6 +22,7 @@ async def create_task(
     create_dto = TaskCreateDTO(
         title=task_data.title,
         description=task_data.description,
+        is_done=task_data.is_done,
     )
     result_dto = await service.create_task(create_dto, user_id=current_user.id)
     return TaskResponse.from_dto(result_dto)

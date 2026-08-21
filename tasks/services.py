@@ -42,6 +42,7 @@ class TaskService:
         new_task = Task(
             title=dto.title,
             description=dto.description,
+            is_done=dto.is_done,
             user_id=owner,
         )
         self.db.add(new_task)
