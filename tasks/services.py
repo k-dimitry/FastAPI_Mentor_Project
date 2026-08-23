@@ -6,6 +6,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from tasks.dto import (
+    TaskActiveUserDTO,
+    TaskActiveUsersDTO,
     TaskCreateDTO,
     TaskListDTO,
     TaskResponseDTO,
@@ -16,6 +18,7 @@ from tasks.dto import (
 )
 from tasks.exceptions import TaskAlreadyExistsError
 from tasks.models import Task
+from users.models import User
 
 
 class TaskService:
@@ -65,7 +68,6 @@ class TaskService:
             return None
         return self._to_dto(task)
 
-    # updated method
     async def get_all_tasks(
         self,
         user_id: UUID,
@@ -205,3 +207,37 @@ class TaskService:
             for row in rows
         ]
         return TaskStatsByDayDTO(items=items)
+
+    async def get_active_users(self, limit: int = 10) -> TaskActiveUsersDTO:
+        """
+        Возвращает топ пользователей по числу невыполненных задач 
+        (is_done=False).
+        """
+        # Подсчёт невыполненных задач по каждому пользователю
+        stmt = (
+            select(
+                User.id.label('user_id'),
+                User.username,
+                User.email,
+                func.count(Task.id).label('open_tasks'),
+            )
+            .join(Task, User.id == Task.user_id)
+            .where(Task.is_done == False)  # noqa: E712
+            .group_by(User.id, User.username, User.email)
+            .order_by(desc('open_tasks'))
+            .limit(limit)
+        )
+
+        result = await self.db.execute(stmt)
+        rows = result.all()
+
+        items = [
+            TaskActiveUserDTO(
+                user_id=row.user_id,
+                username=row.username,
+                email=row.email,
+                open_tasks=row.open_tasks,
+            )
+            for row in rows
+        ]
+        return TaskActiveUsersDTO(items=items)

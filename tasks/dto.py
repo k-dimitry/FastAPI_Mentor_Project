@@ -67,3 +67,16 @@ class TaskStatsByDayItemDTO:
 @dataclass(slots=True, frozen=True)
 class TaskStatsByDayDTO:
     items: list[TaskStatsByDayItemDTO]
+
+
+@dataclass(slots=True, frozen=True)
+class TaskActiveUserDTO:
+    user_id: UUID
+    username: str
+    email: str
+    open_tasks: int
+
+
+@dataclass(slots=True, frozen=True)
+class TaskActiveUsersDTO:
+    items: list[TaskActiveUserDTO]

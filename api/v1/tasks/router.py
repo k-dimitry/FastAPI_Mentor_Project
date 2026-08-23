@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from api.v1.tasks.active_users.endpoint import router as active_users_router
 from api.v1.tasks.create.endpoint import router as create_router
 from api.v1.tasks.delete.endpoint import router as delete_router
 from api.v1.tasks.get_by_id.endpoint import router as get_by_id_router
@@ -14,4 +15,6 @@ router.include_router(get_by_id_router)
 router.include_router(create_router)
 router.include_router(delete_router)
 router.include_router(updated_router)
+router.include_router(active_users_router)
+
 router.include_router(stats_router, prefix='/stats', tags=['Task Stats'])

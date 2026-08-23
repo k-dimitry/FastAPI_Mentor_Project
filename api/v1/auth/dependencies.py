@@ -7,7 +7,7 @@ from database import get_db
 from users.dto import UserResponseDTO
 from users.services import UserService
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl='/api/v1/auth/token')
 
 
 async def get_current_user(
@@ -35,3 +35,15 @@ async def get_current_user(
             detail='User not found',
         )
     return user
+
+
+async def require_admin(
+    current_user: UserResponseDTO = Depends(get_current_user),
+) -> UserResponseDTO:
+    """Проверяет, что текущий пользователь – администратор, иначе 403."""
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail='Only administrators can access this resource',
+        )
+    return current_user
