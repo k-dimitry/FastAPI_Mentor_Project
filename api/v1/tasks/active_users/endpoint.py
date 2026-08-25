@@ -12,7 +12,7 @@ router = APIRouter()
 @router.get('/active-users', response_model=TaskActiveUsersResponse)
 async def get_active_users(
     service: TaskService = Depends(get_task_service),
-    current_user: UserResponseDTO = Depends(require_admin),
+    _: UserResponseDTO = Depends(require_admin),
 ):
     dto = await service.get_active_users(limit=10)
     return TaskActiveUsersResponse.from_dto(dto)

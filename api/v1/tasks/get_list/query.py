@@ -20,11 +20,19 @@ class GetListTaskQuery(BaseModel):
     ] = None
     created_from: Annotated[
         datetime | None,
-        Query(None, description='Дата создания от (включительно)'),
+        Query(
+            None,
+            description='Дата создания от (включительно)',
+            examples=['2026-08-18T07:08:05.241538Z'],
+        ),
     ] = None
     created_to: Annotated[
         datetime | None,
-        Query(None, description='Дата создания до (включительно)'),
+        Query(
+            None,
+            description='Дата создания до (включительно)',
+            examples=['2026-08-19T07:08:05.241538Z'],
+        ),
     ] = None
     query: Annotated[
         str | None,

@@ -37,6 +37,14 @@ class TaskService:
             is_done=task.is_done,
         )
 
+    async def _get_user_task(self, task_id: UUID, user_id: UUID) -> Task | None:
+        """Возвращает задачу, принадлежащую указанному пользователю,
+        или None."""
+        result = await self.db.execute(
+            select(Task).where(Task.id == task_id, Task.user_id == user_id)
+        )
+        return result.scalar_one_or_none()
+
     async def create_task(
         self, dto: TaskCreateDTO, user_id: UUID
     ) -> TaskResponseDTO:
@@ -63,8 +71,8 @@ class TaskService:
         self, task_id: UUID, user_id: UUID
     ) -> TaskResponseDTO | None:
         """Возвращает задачу, только если она принадлежит пользователю."""
-        task = await self.db.get(Task, task_id)
-        if not task or task.user_id != user_id:
+        task = await self._get_user_task(task_id, user_id)
+        if task is None:
             return None
         return self._to_dto(task)
 
@@ -130,8 +138,8 @@ class TaskService:
         self, task_id: UUID, dto: TaskUpdateDTO, user_id: UUID
     ) -> TaskResponseDTO | None:
         """Обновляет задачу, если принадлежит пользователю, иначе None."""
-        task = await self.db.get(Task, task_id)
-        if not task or task.user_id != user_id:
+        task = await self._get_user_task(task_id, user_id)
+        if task is None:
             return None
 
         if dto.title_is_set:
@@ -147,9 +155,10 @@ class TaskService:
 
     async def delete_task(self, task_id: UUID, user_id: UUID) -> bool:
         """Удаляет задачу, только если принадлежит пользователю."""
-        task = await self.db.get(Task, task_id)
-        if not task or task.user_id != user_id:
+        task = await self._get_user_task(task_id, user_id)
+        if task is None:
             return False
+
         await self.db.delete(task)
         await self.db.commit()
         return True
@@ -157,8 +166,8 @@ class TaskService:
     async def get_stats_total(self, user_id: UUID) -> TaskStatsTotalDTO:
         """Возвращает статистику по выполненным/невыполненным задачам."""
         stmt = select(
-            func.count(case((Task.is_done == True, 1))).label('done_count'),
-            func.count(case((Task.is_done == False, 1))).label(
+            func.count(case((Task.is_done is True, 1))).label('done_count'),
+            func.count(case((Task.is_done is False, 1))).label(
                 'not_done_count'
             ),
         ).where(Task.user_id == user_id)
@@ -182,10 +191,10 @@ class TaskService:
             select(
                 func.date(Task.created_at).label('day'),
                 func.count().label('total_count'),
-                func.sum(case((Task.is_done == True, 1), else_=0)).label(
+                func.sum(case((Task.is_done is True, 1), else_=0)).label(
                     'done_count'
                 ),
-                func.sum(case((Task.is_done == False, 1), else_=0)).label(
+                func.sum(case((Task.is_done is False, 1), else_=0)).label(
                     'not_done_count'
                 ),
             )
@@ -210,7 +219,7 @@ class TaskService:
 
     async def get_active_users(self, limit: int = 10) -> TaskActiveUsersDTO:
         """
-        Возвращает топ пользователей по числу невыполненных задач 
+        Возвращает топ пользователей по числу невыполненных задач
         (is_done=False).
         """
         # Подсчёт невыполненных задач по каждому пользователю

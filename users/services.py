@@ -1,3 +1,4 @@
+import asyncio
 from uuid import UUID
 
 import bcrypt
@@ -57,13 +58,19 @@ class UserService:
             return None
         return self._to_dto(user)
 
-    def verify_password(self, plain: str, hashed: str) -> bool:
-        return bcrypt.checkpw(plain.encode(), hashed.encode())
+    async def verify_password(self, plain: str, hashed: str) -> bool:
+        """Проверяет пароль, выполняя bcrypt в отдельном потоке."""
+        return await asyncio.to_thread(
+            bcrypt.checkpw,
+            plain.encode(),
+            hashed.encode(),
+        )
 
     async def authenticate_user(
         self, username_or_email: str, password: str
     ) -> UserResponseDTO | None:
-        """Проверяет учётные данные и возвращает DTO пользователя или None."""
+        """Проверяет учётные данные и возвращает
+        DTO пользователя или None."""
         # Ищем по username или email
         query = select(User).where(
             (User.username == username_or_email)
@@ -73,6 +80,6 @@ class UserService:
         user = result.scalar_one_or_none()
         if not user:
             return None
-        if not self.verify_password(password, user.hashed_password):
+        if not await self.verify_password(password, user.hashed_password):
             return None
         return self._to_dto(user)
