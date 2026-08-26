@@ -163,14 +163,21 @@ class TaskService:
         await self.db.commit()
         return True
 
-    async def get_stats_total(self, user_id: UUID) -> TaskStatsTotalDTO:
-        """Возвращает статистику по выполненным/невыполненным задачам."""
+    async def get_stats_total(
+        self, user_id: UUID | None = None
+    ) -> TaskStatsTotalDTO:
+        """Возвращает статистику по выполненным/невыполненным задачам
+        (всех или конкретного пользователя)."""
         stmt = select(
-            func.count(case((Task.is_done.is_(True), 1))).label('done_count'),
-            func.count(case((Task.is_done.is_(False), 1))).label(
+            func.sum(case((Task.is_done.is_(True), 1), else_=0)).label(
+                'done_count'
+            ),
+            func.sum(case((Task.is_done.is_(False), 1), else_=0)).label(
                 'not_done_count'
             ),
-        ).where(Task.user_id == user_id)
+        )
+        if user_id is not None:
+            stmt = stmt.where(Task.user_id == user_id)
 
         result = await self.db.execute(stmt)
         row = result.one()
@@ -185,23 +192,25 @@ class TaskService:
             done_percent=done_percent,
         )
 
-    async def get_stats_by_day(self, user_id: UUID) -> TaskStatsByDayDTO:
-        """Возвращает статистику задач, сгруппированную по дням создания."""
-        stmt = (
-            select(
-                func.date(Task.created_at).label('day'),
-                func.count().label('total_count'),
-                func.sum(case((Task.is_done.is_(True), 1), else_=0)).label(
-                    'done_count'
-                ),
-                func.sum(case((Task.is_done.is_(False), 1), else_=0)).label(
-                    'not_done_count'
-                ),
-            )
-            .where(Task.user_id == user_id)
-            .group_by('day')
-            .order_by('day')
+    async def get_stats_by_day(
+        self, user_id: UUID | None = None
+    ) -> TaskStatsByDayDTO:
+        """Возвращает статистику задач, сгруппированную по дням
+        (всех или конкретного пользователя)."""
+        day_expr = func.date(Task.created_at)
+        stmt = select(
+            day_expr.label('day'),
+            func.count().label('total_count'),
+            func.sum(case((Task.is_done.is_(True), 1), else_=0)).label(
+                'done_count'
+            ),
+            func.sum(case((Task.is_done.is_(False), 1), else_=0)).label(
+                'not_done_count'
+            ),
         )
+        if user_id is not None:
+            stmt = stmt.where(Task.user_id == user_id)
+        stmt = stmt.group_by(day_expr).order_by(day_expr)
 
         result = await self.db.execute(stmt)
         rows = result.all()
