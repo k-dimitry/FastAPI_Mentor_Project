@@ -10,11 +10,12 @@ from api.v1.tasks.update.endpoint import router as updated_router
 
 router = APIRouter()
 
-router.include_router(get_list_router)
-router.include_router(get_by_id_router)
 router.include_router(create_router)
 router.include_router(delete_router)
-router.include_router(updated_router)
 router.include_router(active_users_router)
+router.include_router(get_by_id_router)
+router.include_router(get_list_router)
+router.include_router(updated_router)
+
 
 router.include_router(stats_router, prefix='/stats', tags=['Task Stats'])

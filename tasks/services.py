@@ -166,8 +166,8 @@ class TaskService:
     async def get_stats_total(self, user_id: UUID) -> TaskStatsTotalDTO:
         """Возвращает статистику по выполненным/невыполненным задачам."""
         stmt = select(
-            func.count(case((Task.is_done is True, 1))).label('done_count'),
-            func.count(case((Task.is_done is False, 1))).label(
+            func.count(case((Task.is_done.is_(True), 1))).label('done_count'),
+            func.count(case((Task.is_done.is_(False), 1))).label(
                 'not_done_count'
             ),
         ).where(Task.user_id == user_id)
@@ -191,10 +191,10 @@ class TaskService:
             select(
                 func.date(Task.created_at).label('day'),
                 func.count().label('total_count'),
-                func.sum(case((Task.is_done is True, 1), else_=0)).label(
+                func.sum(case((Task.is_done.is_(True), 1), else_=0)).label(
                     'done_count'
                 ),
-                func.sum(case((Task.is_done is False, 1), else_=0)).label(
+                func.sum(case((Task.is_done.is_(False), 1), else_=0)).label(
                     'not_done_count'
                 ),
             )
