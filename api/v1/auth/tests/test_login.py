@@ -1,4 +1,5 @@
 import pytest
+from fastapi import status
 from httpx import AsyncClient
 
 
@@ -21,7 +22,7 @@ async def test_login_success(client: AsyncClient):
         '/api/v1/auth/login',
         json={'username_or_email': 'loginuser', 'password': 'StrongPass123!'},
     )
-    assert response.status_code == 200
+    assert response.status_code == status.HTTP_200_OK
     data = response.json()
     assert 'access_token' in data
     assert data['token_type'] == 'bearer'
@@ -45,7 +46,7 @@ async def test_login_wrong_password(client: AsyncClient):
         '/api/v1/auth/login',
         json={'username_or_email': 'loginuser', 'password': 'WrongPass123!'},
     )
-    assert response.status_code == 401
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
 
 @pytest.mark.asyncio
@@ -54,4 +55,4 @@ async def test_login_nonexistent_user(client: AsyncClient):
         '/api/v1/auth/login',
         json={'username_or_email': 'ghost', 'password': 'Whatever123!'},
     )
-    assert response.status_code == 401
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED

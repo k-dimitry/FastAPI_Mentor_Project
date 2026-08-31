@@ -1,4 +1,5 @@
 import pytest
+from fastapi import status
 from httpx import AsyncClient
 
 
@@ -15,7 +16,7 @@ async def test_register_success(client: AsyncClient):
             'birthdate': '1995-01-01',
         },
     )
-    assert response.status_code == 201
+    assert response.status_code == status.HTTP_201_CREATED
     data = response.json()
     assert data['username'] == 'newuser'
     assert data['email'] == 'newuser@example.com'
@@ -49,7 +50,7 @@ async def test_register_duplicate(client: AsyncClient):
             'birthdate': '1995-01-01',
         },
     )
-    assert response.status_code == 409
+    assert response.status_code == status.HTTP_409_CONFLICT
 
 
 @pytest.mark.asyncio
@@ -65,4 +66,4 @@ async def test_register_invalid_password(client: AsyncClient):
             'birthdate': '1995-01-01',
         },
     )
-    assert response.status_code == 422
+    assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT

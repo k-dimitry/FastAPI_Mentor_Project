@@ -1,10 +1,10 @@
 import pytest
+from fastapi import status
 from httpx import AsyncClient
 
 
 @pytest.mark.asyncio
 async def test_get_tasks_authorized(client: AsyncClient, user_token):
-    # Создадим пару задач для пользователя через API
     await client.post(
         '/api/v1/tasks/',
         headers={'Authorization': f'Bearer {user_token}'},
@@ -19,7 +19,7 @@ async def test_get_tasks_authorized(client: AsyncClient, user_token):
         '/api/v1/tasks/',
         headers={'Authorization': f'Bearer {user_token}'},
     )
-    assert response.status_code == 200
+    assert response.status_code == status.HTTP_200_OK
     data = response.json()
     assert 'result' in data
     assert data['count'] == 2
@@ -29,7 +29,7 @@ async def test_get_tasks_authorized(client: AsyncClient, user_token):
 @pytest.mark.asyncio
 async def test_get_tasks_unauthorized(client: AsyncClient):
     response = await client.get('/api/v1/tasks/')
-    assert response.status_code == 401
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
 
 @pytest.mark.asyncio
@@ -39,7 +39,7 @@ async def test_create_task_success(client: AsyncClient, user_token):
         headers={'Authorization': f'Bearer {user_token}'},
         json={'title': 'New task', 'description': 'desc'},
     )
-    assert response.status_code == 201
+    assert response.status_code == status.HTTP_201_CREATED
     data = response.json()
     assert data['title'] == 'New task'
     assert data['is_done'] is False
@@ -51,7 +51,7 @@ async def test_create_task_unauthorized(client: AsyncClient):
         '/api/v1/tasks/',
         json={'title': 'No auth'},
     )
-    assert response.status_code == 401
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
 
 @pytest.mark.asyncio
@@ -69,7 +69,7 @@ async def test_patch_task_owner(client: AsyncClient, user_token):
         headers={'Authorization': f'Bearer {user_token}'},
         json={'title': 'Updated'},
     )
-    assert response.status_code == 200
+    assert response.status_code == status.HTTP_200_OK
     assert response.json()['title'] == 'Updated'
 
 
@@ -89,8 +89,8 @@ async def test_patch_task_foreign(client: AsyncClient, user_token, admin_token):
         json={'title': 'Hacked'},
     )
     assert (
-        response.status_code == 404
-    )  # наша логика отдаёт 404 для чужой задачи
+        response.status_code == status.HTTP_404_NOT_FOUND
+    )
 
 
 @pytest.mark.asyncio
@@ -111,7 +111,7 @@ async def test_get_tasks_filter_is_done(client: AsyncClient, user_token):
         '/api/v1/tasks/?is_done=true',
         headers={'Authorization': f'Bearer {user_token}'},
     )
-    assert response.status_code == 200
+    assert response.status_code == status.HTTP_200_OK
     data = response.json()
     assert data['count'] == 1
     assert data['result'][0]['title'] == 'Done task'
