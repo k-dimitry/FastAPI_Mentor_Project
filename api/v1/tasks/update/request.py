@@ -12,7 +12,7 @@ class TaskUpdateRequest(BaseModel):
             None,
             max_length=50,
             description='Новый заголовок задачи',
-            example='Обновлённое название',
+            json_schema_extra={'example': 'Обновлённое название'},
         ),
     ] = None
 
@@ -22,7 +22,7 @@ class TaskUpdateRequest(BaseModel):
             None,
             max_length=10_000,
             description='Новое описание задачи',
-            example='Новое подробное описание',
+            json_schema_extra={'example': 'Новое подробное описание'},
         ),
     ] = None
 
@@ -31,7 +31,7 @@ class TaskUpdateRequest(BaseModel):
         Field(
             None,
             description='Статус выполнения задачи',
-            example=True,
+            json_schema_extra={'example': True},
         ),
     ] = None
 
