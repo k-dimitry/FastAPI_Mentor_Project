@@ -28,6 +28,7 @@ class Task(TimestampMixin, Base):
     description: Mapped[str | None] = mapped_column(String, nullable=True)
     is_done: Mapped[bool] = mapped_column(default=False)
     user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid,
         ForeignKey('users.id', ondelete='CASCADE'),
         index=True,
     )
