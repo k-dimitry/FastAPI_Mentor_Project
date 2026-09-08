@@ -9,10 +9,6 @@ pytestmark = pytest.mark.asyncio
 
 
 class TestUserService:
-    @pytest.fixture
-    async def service(self, db_session):
-        return UserService(db_session)
-
     async def test_create_user(self, service):
         dto = UserCreateDTO(
             username='newuser',
