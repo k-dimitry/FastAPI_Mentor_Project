@@ -25,3 +25,8 @@ async def already_exists_exception_handler(_: Request, exc: AlreadyExistsError):
         status_code=status.HTTP_409_CONFLICT,
         content={'detail': exc.message},
     )
+
+
+@app.get('/health', include_in_schema=False)
+async def health():
+    return {'status': 'ok'}

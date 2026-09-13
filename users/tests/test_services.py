@@ -58,7 +58,6 @@ class TestUserService:
         tick=False,
     )
     async def test_create_user_timestamps(self, service):
-        # Arrange
         dto = UserCreateDTO(
             username='timeuser',
             email='time@example.com',
@@ -68,10 +67,8 @@ class TestUserService:
         )
         expected = datetime(2026, 8, 30, 12, 30, tzinfo=timezone.utc)
 
-        # Act
         result = await service.create_user(dto)
 
-        # Assert
         assert as_naive_utc(result.created_at) == as_naive_utc(expected)
         assert as_naive_utc(result.updated_at) == as_naive_utc(expected)
 
