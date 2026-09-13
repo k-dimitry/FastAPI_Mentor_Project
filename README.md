@@ -1,0 +1,1 @@
+Now available online [FastAPI Project](https://fastapi-project.hopto.org/docs/)
