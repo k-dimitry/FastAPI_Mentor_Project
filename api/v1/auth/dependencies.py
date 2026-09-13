@@ -31,7 +31,6 @@ async def get_current_user(
             detail='Invalid token payload',
         )
 
-    # Преобразуем строку в UUID
     try:
         user_id = UUID(user_id_str)
     except (ValueError, TypeError):

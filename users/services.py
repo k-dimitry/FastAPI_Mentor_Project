@@ -71,7 +71,6 @@ class UserService:
     ) -> UserResponseDTO | None:
         """Проверяет учётные данные и возвращает
         DTO пользователя или None."""
-        # Ищем по username или email
         query = select(User).where(
             (User.username == username_or_email)
             | (User.email == username_or_email)

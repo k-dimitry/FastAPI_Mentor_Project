@@ -1,4 +1,5 @@
 import asyncio
+from datetime import date, datetime, timezone
 from typing import AsyncGenerator, Optional
 from uuid import uuid4
 
@@ -18,7 +19,6 @@ from main import app
 from tasks.models import Task
 from users.models import User
 
-# Тестовая БД: in-memory SQLite с общим кэшем для всех соединений
 TEST_DATABASE_URL = (
     'sqlite+aiosqlite:///file:memdb1?mode=memory&cache=shared&uri=true'
 )
@@ -73,10 +73,15 @@ async def create_user_in_db(db_session: AsyncSession):
         email: str = 'testuser@example.com',
         password: str = 'StrongPass123!',
         is_admin: bool = False,
+        birthdate: date | str | None = None,
         **kwargs,
     ) -> User:
+        if isinstance(birthdate, str):
+            birthdate = date.fromisoformat(birthdate)
+
         first_name = kwargs.pop('first_name', 'Test')
         last_name = kwargs.pop('last_name', 'User')
+
         user = User(
             username=username,
             email=email,
@@ -84,6 +89,7 @@ async def create_user_in_db(db_session: AsyncSession):
             last_name=last_name,
             hashed_password=hash_password(password),
             is_admin=is_admin,
+            birthdate=birthdate,
             **kwargs,
         )
         db_session.add(user)
@@ -143,3 +149,10 @@ async def create_task_in_db(db_session: AsyncSession):
 @pytest_asyncio.fixture
 async def task_for_user(create_task_in_db, test_user):
     return await create_task_in_db(user_id=test_user.id)
+
+
+def as_naive_utc(dt: datetime) -> datetime:
+    """Приводит datetime к naive UTC для сравнения с time-machine."""
+    if dt.tzinfo is None:
+        return dt
+    return dt.astimezone(timezone.utc).replace(tzinfo=None)

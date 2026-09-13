@@ -108,20 +108,17 @@ class TaskService:
                 )
             )
 
-        # Подзапрос с оконной функцией для подсчёта total
         where_clause = and_(*conditions)
         stmt = select(Task, func.count().over().label('total')).where(
             where_clause
         )
 
-        # Сортировка
         order_column = getattr(Task, order_by, Task.created_at)
         if direction == 'asc':
             stmt = stmt.order_by(asc(order_column))
         else:
             stmt = stmt.order_by(desc(order_column))
 
-        # Пагинация limit/offset
         stmt = stmt.offset(offset).limit(limit)
 
         result = await self.db.execute(stmt)
@@ -231,7 +228,6 @@ class TaskService:
         Возвращает топ пользователей по числу невыполненных задач
         (is_done=False).
         """
-        # Подсчёт невыполненных задач по каждому пользователю
         stmt = (
             select(
                 User.id.label('user_id'),

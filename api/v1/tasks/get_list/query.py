@@ -6,7 +6,6 @@ from pydantic import BaseModel
 
 
 class GetListTaskQuery(BaseModel):
-    # Пагинация limit/offset вместо page/size
     limit: Annotated[
         int, Query(20, ge=1, le=100, description='Количество задач на страницу')
     ] = 20
@@ -14,7 +13,6 @@ class GetListTaskQuery(BaseModel):
         int, Query(0, ge=0, description='Смещение (сколько задач пропустить)')
     ] = 0
 
-    # Фильтры
     is_done: Annotated[
         bool | None, Query(None, description='Фильтр по статусу выполнения')
     ] = None
@@ -44,7 +42,6 @@ class GetListTaskQuery(BaseModel):
         ),
     ] = None
 
-    # Сортировка
     order_by: Annotated[
         Literal['created_at', 'updated_at', 'title'],
         Query('created_at', description='Поле для сортировки'),

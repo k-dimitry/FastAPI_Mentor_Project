@@ -1,9 +1,12 @@
-import pytest
+from datetime import date, datetime, timezone
 
+import pytest
+import time_machine
+
+from conftest import as_naive_utc
 from users.dto import UserCreateDTO
 from users.exceptions import UserAlreadyExistsError
 from users.models import User
-from users.services import UserService
 
 pytestmark = pytest.mark.asyncio
 
@@ -16,67 +19,124 @@ class TestUserService:
             first_name='New',
             last_name='User',
             password='Str0ngPass!',
-            birthdate=None,
+            birthdate=date(1985, 3, 20),
         )
+
         result = await service.create_user(dto)
+
         assert result.username == 'newuser'
         assert result.email == 'new@example.com'
         assert result.first_name == 'New'
         assert result.last_name == 'User'
+        assert result.birthdate == date(1985, 3, 20)
         assert result.is_admin is False
 
         user_in_db = await service.db.get(User, result.id)
         assert user_in_db is not None
-        # Пароль не должен совпадать с исходным (захэширован)
+        assert user_in_db.birthdate == date(1985, 3, 20)
         assert user_in_db.hashed_password != 'Str0ngPass!'
         assert len(user_in_db.hashed_password) > 20
 
-    async def test_create_duplicate_user(self, service):
+    async def test_create_user_without_birthdate(self, service):
         dto = UserCreateDTO(
-            username='duplicate',
-            email='dup@example.com',
-            first_name='Dup',
-            last_name='User',
+            username='nobd',
+            email='nobd@example.com',
+            first_name='No',
+            last_name='Birthdate',
             password='Str0ngPass!',
             birthdate=None,
         )
-        await service.create_user(dto)
+
+        result = await service.create_user(dto)
+
+        assert result.birthdate is None
+        user_in_db = await service.db.get(User, result.id)
+        assert user_in_db.birthdate is None
+
+    @time_machine.travel(
+        datetime(2026, 8, 30, 12, 30, tzinfo=timezone.utc),
+        tick=False,
+    )
+    async def test_create_user_timestamps(self, service):
+        # Arrange
+        dto = UserCreateDTO(
+            username='timeuser',
+            email='time@example.com',
+            first_name='Time',
+            last_name='User',
+            password='Str0ngPass!',
+        )
+        expected = datetime(2026, 8, 30, 12, 30, tzinfo=timezone.utc)
+
+        # Act
+        result = await service.create_user(dto)
+
+        # Assert
+        assert as_naive_utc(result.created_at) == as_naive_utc(expected)
+        assert as_naive_utc(result.updated_at) == as_naive_utc(expected)
+
+    @pytest.mark.parametrize(
+        'username,email',
+        [
+            ('existing', 'different@example.com'),  # дубликат username
+            ('different', 'existing@example.com'),  # дубликат email
+            ('existing', 'existing@example.com'),  # дубликат обоих
+        ],
+    )
+    async def test_create_duplicate_user(
+        self, service, existing_user, username, email
+    ):
+        dto = UserCreateDTO(
+            username=username,
+            email=email,
+            first_name='Dup',
+            last_name='User',
+            password='Str0ngPass!',
+        )
+
         with pytest.raises(UserAlreadyExistsError):
             await service.create_user(dto)
 
-    async def test_authenticate_user_success(self, service):
-        await service.create_user(
-            UserCreateDTO(
-                username='authuser',
-                email='auth@example.com',
-                first_name='Auth',
-                last_name='User',
-                password='Str0ngPass!',
-                birthdate=None,
-            )
-        )
-        authenticated = await service.authenticate_user(
-            'authuser', 'Str0ngPass!'
-        )
-        assert authenticated is not None
-        assert authenticated.username == 'authuser'
+    async def test_authenticate_user_success(self, service, existing_user):
+        username = 'existing'
+        password = 'Str0ngPass!'
 
-    async def test_authenticate_user_wrong_password(self, service):
-        await service.create_user(
-            UserCreateDTO(
-                username='authuser2',
-                email='auth2@example.com',
-                first_name='Auth',
-                last_name='User',
-                password='Str0ngPass!',
-                birthdate=None,
-            )
-        )
+        authenticated = await service.authenticate_user(username, password)
+
+        assert authenticated is not None
+        assert authenticated.id == existing_user.id
+        assert authenticated.username == existing_user.username
+        assert authenticated.email == existing_user.email
+        assert authenticated.first_name == existing_user.first_name
+        assert authenticated.last_name == existing_user.last_name
+        assert authenticated.birthdate == existing_user.birthdate
+        assert authenticated.is_admin == existing_user.is_admin
+
+    async def test_authenticate_user_by_email(self, service, existing_user):
+        email = 'existing@example.com'
+        password = 'Str0ngPass!'
+
+        authenticated = await service.authenticate_user(email, password)
+
+        assert authenticated is not None
+        assert authenticated.id == existing_user.id
+
+    async def test_authenticate_user_wrong_password(
+        self, service, existing_user
+    ):
+        username = 'existing'
+        wrong_password = 'WrongPass'
+
         authenticated = await service.authenticate_user(
-            'authuser2', 'WrongPass'
+            username, wrong_password
         )
+
         assert authenticated is None
 
     async def test_authenticate_user_nonexistent(self, service):
-        authenticated = await service.authenticate_user('ghost', 'Whatever')
+        username = 'ghost'
+        password = 'Whatever'
+
+        authenticated = await service.authenticate_user(username, password)
+
         assert authenticated is None

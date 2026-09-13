@@ -51,10 +51,7 @@ def _mask_sensitive_data(data):
                 else:
                     masked_pairs.append(pair)
             return '&'.join(masked_pairs)
-        else:
-            return data
-    else:
-        return data
+    return data
 
 
 def _safe_json_loads(body: bytes):

@@ -20,7 +20,6 @@ async def get_user_with_access_check(
     current_user: UserResponseDTO = Depends(get_current_user),
 ) -> UserResponseDTO:
     """Проверяет права доступа и возвращает запрашиваемого пользователя."""
-    # Только автор (сам пользователь) или администратор
     if not is_author_or_admin(
         current_user_id=current_user.id,
         target_user_id=user_id,

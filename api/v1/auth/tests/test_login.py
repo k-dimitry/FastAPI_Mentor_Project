@@ -2,47 +2,71 @@ import pytest
 from fastapi import status
 from httpx import AsyncClient
 
+from common.security import decode_access_token
 
-class TestLogin:
-    @pytest.fixture
-    async def login_user(self, create_user_in_db):
-        return await create_user_in_db(
-            username='loginuser',
-            email='loginuser@example.com',
-            password='StrongPass123!',
-            first_name='Login',
-            last_name='User',
-        )
 
-    async def test_login_success(self, client: AsyncClient, login_user):
+class TestLoginSuccess:
+    @pytest.mark.parametrize('login_field', ['username', 'email'])
+    async def test_login_success(
+        self, client: AsyncClient, login_user, login_field
+    ):
+        credential = getattr(login_user, login_field)
+        password = 'StrongPass123!'
+
         response = await client.post(
             '/api/v1/auth/login',
             json={
-                'username_or_email': 'loginuser',
-                'password': 'StrongPass123!',
+                'username_or_email': credential,
+                'password': password,
             },
         )
+
         assert response.status_code == status.HTTP_200_OK
         data = response.json()
-        assert 'access_token' in data
-        assert data['token_type'] == 'bearer'
 
+        assert set(data.keys()) == {'access_token', 'token_type'}
+        assert data['token_type'] == 'bearer'
+        assert isinstance(data['access_token'], str)
+        assert len(data['access_token']) > 0
+
+        payload = decode_access_token(data['access_token'])
+        assert payload is not None
+        assert payload['sub'] == str(login_user.id)
+        assert 'exp' in payload
+
+
+class TestLoginFailure:
     async def test_login_wrong_password(self, client: AsyncClient, login_user):
-        response = await client.post(
-            '/api/v1/auth/login',
-            json={
-                'username_or_email': 'loginuser',
-                'password': 'WrongPass123!',
-            },
-        )
+        payload = {
+            'username_or_email': login_user.username,
+            'password': 'WrongPass123!',
+        }
+
+        response = await client.post('/api/v1/auth/login', json=payload)
+
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
-        # Уточните сообщение об ошибке в вашем эндпоинте
         assert response.json() == {'detail': 'Invalid credentials'}
 
     async def test_login_nonexistent_user(self, client: AsyncClient):
-        response = await client.post(
-            '/api/v1/auth/login',
-            json={'username_or_email': 'ghost', 'password': 'Whatever123!'},
-        )
+        payload = {
+            'username_or_email': 'ghost',
+            'password': 'Whatever123!',
+        }
+
+        response = await client.post('/api/v1/auth/login', json=payload)
+
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+        assert response.json() == {'detail': 'Invalid credentials'}
+
+    async def test_login_wrong_username_correct_password(
+        self, client: AsyncClient, login_user
+    ):
+        payload = {
+            'username_or_email': 'nonexistent',
+            'password': 'StrongPass123!',
+        }
+
+        response = await client.post('/api/v1/auth/login', json=payload)
+
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
         assert response.json() == {'detail': 'Invalid credentials'}
