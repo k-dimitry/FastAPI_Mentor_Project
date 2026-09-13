@@ -92,9 +92,6 @@ jobs:
             set -e
             cd /opt/fastapi_project
 
-            echo "${{ secrets.GITHUB_TOKEN }}" | \
-              docker login ghcr.io -u ${{ github.actor }} --password-stdin
-
             docker compose -f docker-compose.prod.yml pull app migrations
 
             docker compose -f docker-compose.prod.yml run --rm migrations
