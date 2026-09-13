@@ -30,3 +30,8 @@ async def already_exists_exception_handler(_: Request, exc: AlreadyExistsError):
 @app.get('/health', include_in_schema=False)
 async def health():
     return {'status': 'ok'}
+
+
+@app.get('/', include_in_schema=False)
+async def root():
+    return {'message': 'FastAPI Mentor Project API', 'docs': '/docs'}
