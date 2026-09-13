@@ -2,7 +2,7 @@ name: CI/CD
 
 on:
   push:
-    branches: [master]
+    branches: [ master ]
   pull_request:
 
 env:
@@ -91,11 +91,9 @@ jobs:
           script: |
             set -e
             cd /opt/fastapi_project
-
+            
+            docker logout ghcr.io || true
             docker compose -f docker-compose.prod.yml pull app migrations
-
             docker compose -f docker-compose.prod.yml run --rm migrations
-
             docker compose -f docker-compose.prod.yml up -d app
-
             docker image prune -f
