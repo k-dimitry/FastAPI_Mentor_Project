@@ -128,7 +128,6 @@ class TestTasksCreate:
         self, client, user_token, db_session, test_user
     ):
         payload = {'title': 'New Task', 'description': 'desc'}
-        expected_dt = datetime(2026, 8, 30, 12, 30, 0, tzinfo=timezone.utc)
 
         response = await client.post(
             '/api/v1/tasks/',

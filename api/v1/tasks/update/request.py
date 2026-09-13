@@ -2,7 +2,7 @@ from typing import Annotated
 
 from pydantic import BaseModel, Field
 
-from tasks.dto import UNSET, TaskUpdateDTO
+from tasks.dto import TaskUpdateDTO
 
 
 class TaskUpdateRequest(BaseModel):

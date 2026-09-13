@@ -2,7 +2,7 @@ import json
 import logging
 from time import perf_counter
 
-from fastapi import Request, Response
+from fastapi import Request
 from fastapi.concurrency import iterate_in_threadpool
 
 logger = logging.getLogger('app')

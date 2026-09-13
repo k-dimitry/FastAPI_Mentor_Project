@@ -3,7 +3,6 @@ from fastapi import APIRouter, Depends, status
 from api.v1.users.common_schemas import UserResponse
 from api.v1.users.dependencies import get_user_service
 from api.v1.users.register.request import UserRegisterRequest
-from users.dto import UserCreateDTO
 from users.services import UserService
 
 router = APIRouter()
