@@ -4,6 +4,7 @@ import pytest
 import pytest_asyncio
 
 pytestmark = pytest.mark.asyncio
+CORRECT_PASSWORD: str = 'StrongPass123!'
 
 
 @pytest_asyncio.fixture

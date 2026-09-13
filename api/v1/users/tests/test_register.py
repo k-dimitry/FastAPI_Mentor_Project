@@ -6,6 +6,7 @@ import time_machine
 from fastapi import status
 from httpx import AsyncClient
 
+from api.v1.users.tests.conftest import CORRECT_PASSWORD
 from conftest import as_naive_utc
 
 
@@ -20,7 +21,7 @@ class TestUserRegisterSuccess:
             'email': 'newuser@example.com',
             'first_name': 'New',
             'last_name': 'User',
-            'password': 'StrongPass123!',
+            'password': CORRECT_PASSWORD,
             'birthdate': '1995-01-01',
         }
 
@@ -61,7 +62,7 @@ class TestUserRegisterSuccess:
             'email': 'nobirth@example.com',
             'first_name': 'No',
             'last_name': 'Birthdate',
-            'password': 'StrongPass123!',
+            'password': CORRECT_PASSWORD,
         }
 
         response = await client.post('/api/v1/users/register', json=payload)
@@ -92,7 +93,7 @@ class TestUserRegisterDuplicate:
             'email': email,
             'first_name': 'New',
             'last_name': 'User',
-            'password': 'StrongPass123!',
+            'password': CORRECT_PASSWORD,
             'birthdate': '1995-01-01',
         }
 
@@ -137,23 +138,66 @@ class TestUserRegisterValidation:
         assert any('password' in err['loc'] for err in body['detail'])
 
     @pytest.mark.parametrize(
-        'field,value',
+        'field,value,expected_error',
         [
-            ('username', 'ab'),
-            ('email', 'not-an-email'),
-            ('first_name', ''),
-            ('last_name', ''),
+            (
+                'username',
+                'ab',
+                {
+                    'type': 'string_too_short',
+                    'loc': ['body', 'username'],
+                    'msg': 'String should have at least 3 characters',
+                    'input': 'ab',
+                    'ctx': {'min_length': 3},
+                },
+            ),
+            (
+                'email',
+                'not-an-email',
+                {
+                    'type': 'value_error',
+                    'loc': ['body', 'email'],
+                    'msg': (
+                        'value is not a valid email address: '
+                        'An email address must have an @-sign.'
+                    ),
+                    'input': 'not-an-email',
+                    'ctx': {'reason': 'An email address must have an @-sign.'},
+                },
+            ),
+            (
+                'first_name',
+                '',
+                {
+                    'type': 'string_too_short',
+                    'loc': ['body', 'first_name'],
+                    'msg': 'String should have at least 1 character',
+                    'input': '',
+                    'ctx': {'min_length': 1},
+                },
+            ),
+            (
+                'last_name',
+                '',
+                {
+                    'type': 'string_too_short',
+                    'loc': ['body', 'last_name'],
+                    'msg': 'String should have at least 1 character',
+                    'input': '',
+                    'ctx': {'min_length': 1},
+                },
+            ),
         ],
     )
     async def test_register_invalid_fields(
-        self, client: AsyncClient, field: str, value: str
+        self, client: AsyncClient, field, value, expected_error
     ):
         payload = {
             'username': 'user',
             'email': 'user@example.com',
             'first_name': 'User',
             'last_name': 'User',
-            'password': 'StrongPass123!',
+            'password': CORRECT_PASSWORD,
             'birthdate': '1995-01-01',
             field: value,
         }
@@ -162,4 +206,5 @@ class TestUserRegisterValidation:
 
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
         body = response.json()
-        assert any(field in err['loc'] for err in body['detail'])
+
+        assert body == {'detail': [expected_error]}

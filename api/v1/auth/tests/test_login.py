@@ -2,6 +2,7 @@ import pytest
 from fastapi import status
 from httpx import AsyncClient
 
+from api.v1.auth.tests.conftest import CORRECT_PASSWORD
 from common.security import decode_access_token
 
 
@@ -11,7 +12,7 @@ class TestLoginSuccess:
         self, client: AsyncClient, login_user, login_field
     ):
         credential = getattr(login_user, login_field)
-        password = 'StrongPass123!'
+        password = CORRECT_PASSWORD
 
         response = await client.post(
             '/api/v1/auth/login',
@@ -63,7 +64,7 @@ class TestLoginFailure:
     ):
         payload = {
             'username_or_email': 'nonexistent',
-            'password': 'StrongPass123!',
+            'password': CORRECT_PASSWORD,
         }
 
         response = await client.post('/api/v1/auth/login', json=payload)

@@ -3,6 +3,7 @@ import pytest_asyncio
 
 pytestmark = pytest.mark.asyncio
 
+CORRECT_PASSWORD: str = 'StrongPass123!'
 
 @pytest_asyncio.fixture
 async def login_user(create_user_in_db):
@@ -10,7 +11,7 @@ async def login_user(create_user_in_db):
     return await create_user_in_db(
         username='loginuser',
         email='loginuser@example.com',
-        password='StrongPass123!',
+        password=CORRECT_PASSWORD,
         first_name='Login',
         last_name='User',
     )
