@@ -271,7 +271,7 @@ class TestTasksPatch:
         assert data['title'] == created_task.title
         assert data['description'] == created_task.description
 
-    async def test_patch_task_foreign(
+    async def test_patch_task_other_user(
         self, client: AsyncClient, admin_token, created_task, db_session
     ):
         task_id = created_task.id
@@ -291,7 +291,7 @@ class TestTasksPatch:
         task_in_db = await db_session.get(Task, task_id)
         assert task_in_db.title == original_title
 
-    async def test_patch_task_nonexistent(
+    async def test_patch_task_no_exist(
         self, client: AsyncClient, user_token
     ):
         task_id = uuid.uuid4()

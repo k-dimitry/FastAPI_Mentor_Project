@@ -97,3 +97,13 @@ jobs:
             docker compose -f docker-compose.prod.yml run --rm migrations
             docker compose -f docker-compose.prod.yml up -d app
             docker image prune -f
+
+      - name: Send Telegram notification
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_TO }}
+          token: ${{ secrets.TELEGRAM_TOKEN }}
+          message: |
+            ✅ Деплой FastAPI_Mentor_Project успешно завершён!
+            Ветка: ${{ github.ref_name }}
+            Коммит: ${{ github.sha }}

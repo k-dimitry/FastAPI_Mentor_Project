@@ -129,6 +129,8 @@ async def create_task_in_db(db_session: AsyncSession):
         title: str = 'Test Task',
         description: Optional[str] = None,
         is_done: bool = False,
+        created_at: Optional[datetime] = None,
+        updated_at: Optional[datetime] = None,
     ) -> Task:
         task = Task(
             user_id=user_id,
@@ -136,6 +138,10 @@ async def create_task_in_db(db_session: AsyncSession):
             description=description,
             is_done=is_done,
         )
+        if created_at is not None:
+            task.created_at = created_at
+        if updated_at is not None:
+            task.updated_at = updated_at
         db_session.add(task)
         await db_session.commit()
         await db_session.refresh(task)
