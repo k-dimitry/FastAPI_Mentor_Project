@@ -13,6 +13,8 @@ jobs:
   test:
     name: Lint & Test
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     env:
       DATABASE_URL: postgresql+asyncpg://test:test@localhost:5432/test
       JWT_SECRET_KEY: test-secret-key-for-ci-only-min-32-chars
