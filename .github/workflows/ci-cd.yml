@@ -34,7 +34,8 @@ jobs:
         run: uv run ruff check .
 
       - name: Pytest
-        run: uv run pytest -q
+        run: |
+          uv run pytest --cov=./ --cov-report=xml
 
       - name: Generate tests coverage badge
         run: uv run genbadge coverage -i coverage.xml -o coverage.svg
