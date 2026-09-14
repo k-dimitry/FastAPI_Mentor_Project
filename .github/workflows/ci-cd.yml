@@ -36,6 +36,15 @@ jobs:
       - name: Pytest
         run: uv run pytest -q
 
+      - name: Generate tests coverage badge
+        run: uv run genbadge coverage -i coverage.xml -o coverage.svg
+
+      - name: Commit tests coverage badge
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          file_pattern: 'coverage.svg'
+          commit_message: 'chore: update coverage badge'
+
   build-and-push:
     name: Build & Push image
     needs: test
