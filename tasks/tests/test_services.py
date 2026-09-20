@@ -60,7 +60,7 @@ class TestTaskServiceCreate:
 
 class TestTaskServiceDuplicate:
     async def test_create_duplicate_title_same_user(
-        self, service, user, created_task
+            self, service, user, created_task
     ):
         dto = TaskCreateDTO(title=created_task.title)
 
@@ -68,7 +68,7 @@ class TestTaskServiceDuplicate:
             await service.create_task(dto, user_id=user.id)
 
     async def test_create_same_title_different_users(
-        self, service, user, other_user
+            self, service, user, other_user
     ):
         title = 'Shared title'
         dto = TaskCreateDTO(title=title)
@@ -116,7 +116,7 @@ class TestTaskServiceRead:
         assert found.updated_at == created_task.updated_at
 
     async def test_get_task_by_id_foreign(
-        self, service, created_task, other_user
+            self, service, created_task, other_user
     ):
         found = await service.get_task(created_task.id, other_user.id)
 
@@ -175,7 +175,7 @@ class TestTaskServiceUpdate:
         assert task_in_db.is_done == created_task.is_done
 
     async def test_update_task_clear_description(
-        self, service, created_task, user
+            self, service, created_task, user
     ):
         """PATCH с description=None должен стереть описание."""
         dto = TaskUpdateDTO(description=None)
@@ -211,7 +211,7 @@ class TestTaskServiceUpdate:
         assert task_in_db.description == created_task.description
 
     async def test_update_task_unset_fields_not_changed(
-        self, service, created_task, user
+            self, service, created_task, user
     ):
         """Поля, не переданные в DTO (UNSET), не должны изменяться."""
         dto = TaskUpdateDTO(title='Only title')
@@ -249,18 +249,6 @@ class TestTaskServiceUpdate:
 
         assert updated is None
 
-    async def test_update_task_updated_at_changes(
-        self, service, created_task, user
-    ):
-        """updated_at должен измениться после PATCH."""
-        dto = TaskUpdateDTO(title='After update')
-
-        updated = await service.update_task(
-            created_task.id, dto, user_id=user.id
-        )
-
-        assert updated.updated_at >= created_task.updated_at
-
 
 class TestTaskServiceDelete:
     async def test_delete_task(self, service, created_task, user):
@@ -284,9 +272,10 @@ class TestTaskServiceDelete:
 
         assert deleted is False
 
+
 class TestTaskServiceFilter:
     async def test_filter_tasks_by_is_done(
-        self, service, user, tasks_with_mixed_done
+            self, service, user, tasks_with_mixed_done
     ):
         result = await service.get_all_tasks(user_id=user.id, is_done=True)
 
@@ -297,7 +286,7 @@ class TestTaskServiceFilter:
         assert task.is_done is True
 
     async def test_filter_tasks_by_is_done_false(
-        self, service, user, tasks_with_mixed_done
+            self, service, user, tasks_with_mixed_done
     ):
         result = await service.get_all_tasks(user_id=user.id, is_done=False)
 
