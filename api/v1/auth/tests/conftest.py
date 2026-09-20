@@ -1,17 +1,19 @@
-import pytest
-import pytest_asyncio
+from unittest.mock import AsyncMock
 
-pytestmark = pytest.mark.asyncio
+import pytest
+
+from api.v1.users.dependencies import get_user_service
+from main import app
+from users.services import UserService
 
 CORRECT_PASSWORD: str = 'StrongPass123!'
 
-@pytest_asyncio.fixture
-async def login_user(create_user_in_db):
-    """Пользователь с известным паролем для тестов логина."""
-    return await create_user_in_db(
-        username='loginuser',
-        email='loginuser@example.com',
-        password=CORRECT_PASSWORD,
-        first_name='Login',
-        last_name='User',
-    )
+
+@pytest.fixture
+def mock_auth_service():
+    """Подменяет get_user_service на AsyncMock через dependency_overrides."""
+    mock_service = AsyncMock(spec=UserService)
+
+    app.dependency_overrides[get_user_service] = lambda: mock_service
+    yield mock_service
+    app.dependency_overrides.pop(get_user_service, None)

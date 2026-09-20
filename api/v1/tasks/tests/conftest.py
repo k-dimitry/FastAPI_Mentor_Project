@@ -1,7 +1,11 @@
+from unittest.mock import AsyncMock
+
 import pytest
 import pytest_asyncio
 
-pytestmark = pytest.mark.asyncio
+from api.v1.tasks.dependencies import get_task_service
+from main import app
+from tasks.services import TaskService
 
 
 @pytest_asyncio.fixture
@@ -27,3 +31,13 @@ async def tasks_for_user(create_task_in_db, test_user):
         user_id=test_user.id, title='Task 3', description='desc3'
     )
     return {'task_1': task_1, 'task_2': task_2, 'task_3': task_3}
+
+
+@pytest.fixture
+def mock_task_service():
+    """Подменяет get_task_service на AsyncMock через dependency_overrides."""
+    mock_service = AsyncMock(spec=TaskService)
+
+    app.dependency_overrides[get_task_service] = lambda: mock_service
+    yield mock_service
+    app.dependency_overrides.pop(get_task_service, None)

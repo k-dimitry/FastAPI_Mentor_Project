@@ -1,21 +1,35 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 import pytest
-import time_machine
 from fastapi import status
 from httpx import AsyncClient
 
 from api.v1.users.tests.conftest import CORRECT_PASSWORD
-from conftest import as_naive_utc
+from users.dto import UserCreateDTO, UserResponseDTO
+from users.models import User
 
 
 class TestUserRegisterSuccess:
-    @time_machine.travel(
-        datetime(2026, 8, 30, 12, 30, tzinfo=timezone.utc),
-        tick=False,
-    )
-    async def test_register_success(self, client: AsyncClient):
+    async def test_register_success(
+        self, client: AsyncClient, mock_user_service
+    ):
+        fixed_id = uuid.UUID('11111111-1111-1111-1111-111111111111')
+        fixed_dt = datetime(2026, 8, 30, 12, 30, tzinfo=timezone.utc)
+
+        expected_dto = UserResponseDTO(
+            id=fixed_id,
+            username='newuser',
+            email='newuser@example.com',
+            first_name='New',
+            last_name='User',
+            birthdate=date(1995, 1, 1),
+            created_at=fixed_dt,
+            updated_at=fixed_dt,
+            is_admin=False,
+        )
+        mock_user_service.create_user.return_value = expected_dto
+
         payload = {
             'username': 'newuser',
             'email': 'newuser@example.com',
@@ -30,31 +44,60 @@ class TestUserRegisterSuccess:
         assert response.status_code == status.HTTP_201_CREATED
         data = response.json()
 
-        assert data == {
-            'id': data['id'],
-            'username': 'newuser',
-            'email': 'newuser@example.com',
-            'first_name': 'New',
+        assert data['id'] == str(fixed_id)
+        assert data['username'] == 'newuser'
+        assert data['email'] == 'newuser@example.com'
+        assert data['first_name'] == 'New'
+        assert data['last_name'] == 'User'
+        assert data['birthdate'] == '1995-01-01'
+        assert data['is_admin'] is False
+
+        created_at = datetime.fromisoformat(data['created_at'])
+        updated_at = datetime.fromisoformat(data['updated_at'])
+        assert created_at == fixed_dt
+        assert updated_at == fixed_dt
+
+        expected_create_dto = UserCreateDTO(
+            username='newuser',
+            email='newuser@example.com',
+            first_name='New',
+            last_name='User',
+            password=CORRECT_PASSWORD,
+            birthdate=date(1995, 1, 1),
+        )
+        mock_user_service.create_user.assert_called_once_with(
+            expected_create_dto
+        )
+
+    async def test_register_persists_to_db(
+        self, client: AsyncClient, db_session
+    ):
+        payload = {
+            'username': 'persisted',
+            'email': 'persisted@example.com',
+            'first_name': 'Persisted',
             'last_name': 'User',
+            'password': CORRECT_PASSWORD,
             'birthdate': '1995-01-01',
-            'created_at': data['created_at'],
-            'updated_at': data['updated_at'],
-            'is_admin': False,
         }
 
-        user_id = uuid.UUID(data['id'])
-        assert isinstance(user_id, uuid.UUID)
+        response = await client.post('/api/v1/users/register', json=payload)
 
-        expected_naive = datetime(2026, 8, 30, 12, 30)
+        assert response.status_code == status.HTTP_201_CREATED
+        user_id = uuid.UUID(response.json()['id'])
 
-        created_at = datetime.fromisoformat(
-            data['created_at'].replace('Z', '+00:00')
-        )
-        updated_at = datetime.fromisoformat(
-            data['updated_at'].replace('Z', '+00:00')
-        )
-        assert as_naive_utc(created_at) == expected_naive
-        assert as_naive_utc(updated_at) == expected_naive
+        db_session.expire_all()
+        user_in_db = await db_session.get(User, user_id)
+        assert user_in_db is not None
+        assert user_in_db.username == 'persisted'
+        assert user_in_db.email == 'persisted@example.com'
+        assert user_in_db.first_name == 'Persisted'
+        assert user_in_db.last_name == 'User'
+        assert user_in_db.birthdate == date(1995, 1, 1)
+        assert user_in_db.is_admin is False
+
+        assert user_in_db.hashed_password != CORRECT_PASSWORD
+        assert len(user_in_db.hashed_password) > 20
 
     async def test_register_without_birthdate(self, client: AsyncClient):
         payload = {
@@ -73,20 +116,34 @@ class TestUserRegisterSuccess:
 
 class TestUserRegisterDuplicate:
     @pytest.mark.parametrize(
-        'username,email,expect_detail_fragment',
+        'username,email,expected_detail',
         [
-            ('newuser', 'different@example.com', 'newuser'),
-            ('different', 'newuser@example.com', 'newuser@example.com'),
-            ('newuser', 'newuser@example.com', 'newuser'),
+            (
+                'newuser',
+                'different@example.com',
+                "User 'newuser' or email 'different@example.com' "
+                'already exists.',
+            ),
+            (
+                'different',
+                'newuser@example.com',
+                "User 'different' or email 'newuser@example.com' "
+                'already exists.',
+            ),
+            (
+                'newuser',
+                'newuser@example.com',
+                "User 'newuser' or email 'newuser@example.com' already exists.",
+            ),
         ],
     )
     async def test_register_duplicate(
         self,
         client: AsyncClient,
         registered_user,
-        username,
-        email,
-        expect_detail_fragment,
+        username: str,
+        email: str,
+        expected_detail: str,
     ):
         payload = {
             'username': username,
@@ -100,26 +157,119 @@ class TestUserRegisterDuplicate:
         response = await client.post('/api/v1/users/register', json=payload)
 
         assert response.status_code == status.HTTP_409_CONFLICT
-        body = response.json()
-        assert 'detail' in body
-        assert 'already exists' in body['detail']
+        assert response.json() == {'detail': expected_detail}
 
 
 class TestUserRegisterValidation:
     @pytest.mark.parametrize(
-        'password',
+        'password,expected_error',
         [
-            'weak',
-            'short',
-            '12345678',
-            'nouppercase1!',
-            'NOLOWERCASE1!',
-            'NoNumber!',
-            'NoSpecialChar111111',
+            (
+                'weak',
+                {
+                    'type': 'too_short',
+                    'loc': ['body', 'password'],
+                    'msg': (
+                        'Value should have at least 8 items '
+                        'after validation, not 4'
+                    ),
+                    'input': 'weak',
+                    'ctx': {
+                        'field_type': 'Value',
+                        'min_length': 8,
+                        'actual_length': 4,
+                    },
+                },
+            ),
+            (
+                'short',
+                {
+                    'type': 'too_short',
+                    'loc': ['body', 'password'],
+                    'msg': (
+                        'Value should have at least 8 items '
+                        'after validation, not 5'
+                    ),
+                    'input': 'short',
+                    'ctx': {
+                        'field_type': 'Value',
+                        'min_length': 8,
+                        'actual_length': 5,
+                    },
+                },
+            ),
+            (
+                '12345678',
+                {
+                    'type': 'value_error',
+                    'loc': ['body', 'password'],
+                    'msg': (
+                        'Value error, Пароль должен содержать '
+                        'хотя бы одну заглавную букву'
+                    ),
+                    'input': '12345678',
+                    'ctx': {'error': {}},
+                },
+            ),
+            (
+                'nouppercase1!',
+                {
+                    'type': 'value_error',
+                    'loc': ['body', 'password'],
+                    'msg': (
+                        'Value error, Пароль должен содержать '
+                        'хотя бы одну заглавную букву'
+                    ),
+                    'input': 'nouppercase1!',
+                    'ctx': {'error': {}},
+                },
+            ),
+            (
+                'NOLOWERCASE1!',
+                {
+                    'type': 'value_error',
+                    'loc': ['body', 'password'],
+                    'msg': (
+                        'Value error, Пароль должен содержать '
+                        'хотя бы одну строчную букву'
+                    ),
+                    'input': 'NOLOWERCASE1!',
+                    'ctx': {'error': {}},
+                },
+            ),
+            (
+                'NoNumber!',
+                {
+                    'type': 'value_error',
+                    'loc': ['body', 'password'],
+                    'msg': (
+                        'Value error, Пароль должен содержать '
+                        'хотя бы одну цифру'
+                    ),
+                    'input': 'NoNumber!',
+                    'ctx': {'error': {}},
+                },
+            ),
+            (
+                'NoSpecialChar111111',
+                {
+                    'type': 'value_error',
+                    'loc': ['body', 'password'],
+                    'msg': (
+                        'Value error, Пароль должен содержать '
+                        'хотя бы один специальный символ (!@#$%^&*)'
+                    ),
+                    'input': 'NoSpecialChar111111',
+                    'ctx': {'error': {}},
+                },
+            ),
         ],
     )
     async def test_register_invalid_password(
-        self, client: AsyncClient, password: str
+        self,
+        client: AsyncClient,
+        password: str,
+        expected_error: dict,
     ):
         payload = {
             'username': 'user',
@@ -133,9 +283,7 @@ class TestUserRegisterValidation:
         response = await client.post('/api/v1/users/register', json=payload)
 
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
-        body = response.json()
-        assert 'detail' in body
-        assert any('password' in err['loc'] for err in body['detail'])
+        assert response.json() == {'detail': [expected_error]}
 
     @pytest.mark.parametrize(
         'field,value,expected_error',

@@ -12,12 +12,6 @@ def get_pagination_urls(
     """
     Возвращает URL-адреса для следующей и предыдущей страниц
     на основе limit/offset.
-
-    :param request: Объект запроса FastAPI.
-    :param offset: Текущее смещение.
-    :param limit: Количество элементов на странице.
-    :param total: Общее количество элементов.
-    :return: Кортеж (next_url, previous_url). None, если страницы нет.
     """
     next_url = None
     previous_url = None

@@ -3,7 +3,6 @@ from datetime import date, datetime, timezone
 import pytest
 import time_machine
 
-from conftest import as_naive_utc
 from users.dto import UserCreateDTO
 from users.exceptions import UserAlreadyExistsError
 from users.models import User
@@ -69,15 +68,15 @@ class TestUserService:
 
         result = await service.create_user(dto)
 
-        assert as_naive_utc(result.created_at) == as_naive_utc(expected)
-        assert as_naive_utc(result.updated_at) == as_naive_utc(expected)
+        assert result.created_at == expected
+        assert result.updated_at == expected
 
     @pytest.mark.parametrize(
         'username,email',
         [
-            ('existing', 'different@example.com'),  # дубликат username
-            ('different', 'existing@example.com'),  # дубликат email
-            ('existing', 'existing@example.com'),  # дубликат обоих
+            ('existing', 'different@example.com'),
+            ('different', 'existing@example.com'),
+            ('existing', 'existing@example.com'),
         ],
     )
     async def test_create_duplicate_user(

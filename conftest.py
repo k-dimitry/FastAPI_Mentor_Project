@@ -1,4 +1,4 @@
-from datetime import date, datetime, timezone
+from datetime import date, datetime
 from typing import AsyncGenerator, Optional
 
 import pytest
@@ -153,10 +153,3 @@ async def create_task_in_db(db_session: AsyncSession):
 @pytest_asyncio.fixture
 async def task_for_user(create_task_in_db, test_user):
     return await create_task_in_db(user_id=test_user.id)
-
-
-def as_naive_utc(dt: datetime) -> datetime:
-    """Приводит datetime к naive UTC для сравнения с time-machine."""
-    if dt.tzinfo is None:
-        return dt
-    return dt.astimezone(timezone.utc).replace(tzinfo=None)

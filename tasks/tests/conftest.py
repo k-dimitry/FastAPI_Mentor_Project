@@ -38,3 +38,27 @@ async def created_task(service, user):
         TaskCreateDTO(title='Original', description='original desc'),
         user_id=user.id,
     )
+
+
+@pytest_asyncio.fixture
+async def five_tasks(service, user):
+    """Пять задач для user: Task 0 .. Task 4 (created_at ≈ now)."""
+    tasks = []
+    for i in range(5):
+        task = await service.create_task(
+            TaskCreateDTO(title=f'Task {i}'), user_id=user.id
+        )
+        tasks.append(task)
+    return tasks
+
+
+@pytest_asyncio.fixture
+async def tasks_with_mixed_done(service, user):
+    """Две задачи для user: одна is_done=True, одна is_done=False."""
+    done = await service.create_task(
+        TaskCreateDTO(title='Done', is_done=True), user_id=user.id
+    )
+    not_done = await service.create_task(
+        TaskCreateDTO(title='Not Done', is_done=False), user_id=user.id
+    )
+    return {'done': done, 'not_done': not_done}

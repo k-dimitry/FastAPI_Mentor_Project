@@ -4,8 +4,7 @@ from uuid import uuid4
 import pytest
 import time_machine
 
-from conftest import as_naive_utc
-from tasks.dto import TaskCreateDTO, TaskResponseDTO, TaskUpdateDTO
+from tasks.dto import TaskCreateDTO, TaskUpdateDTO
 from tasks.exceptions import TaskAlreadyExistsError
 from tasks.models import Task
 
@@ -18,7 +17,6 @@ class TestTaskServiceCreate:
 
         result = await service.create_task(dto, user_id=user.id)
 
-        assert isinstance(result, TaskResponseDTO)
         assert result.title == 'Test'
         assert result.description == 'desc'
         assert result.is_done is False
@@ -52,9 +50,12 @@ class TestTaskServiceCreate:
         expected = datetime(2026, 8, 30, 12, 30, tzinfo=timezone.utc)
 
         result = await service.create_task(dto, user_id=user.id)
+        task_in_db = await service.db.get(Task, result.id)
 
-        assert as_naive_utc(result.created_at) == as_naive_utc(expected)
-        assert as_naive_utc(result.updated_at) == as_naive_utc(expected)
+        assert result.created_at == expected
+        assert result.updated_at == expected
+        assert task_in_db.created_at == expected
+        assert task_in_db.updated_at == expected
 
 
 class TestTaskServiceDuplicate:
@@ -79,12 +80,7 @@ class TestTaskServiceDuplicate:
 
 
 class TestTaskServiceRead:
-    async def test_get_all_tasks_pagination(self, service, user):
-        for i in range(5):
-            await service.create_task(
-                TaskCreateDTO(title=f'Task {i}'), user_id=user.id
-            )
-
+    async def test_get_all_tasks_pagination(self, service, user, five_tasks):
         result = await service.get_all_tasks(
             user_id=user.id,
             limit=2,
@@ -133,8 +129,13 @@ class TestTaskServiceRead:
 
 
 class TestTaskServiceUpdate:
+    @time_machine.travel(
+        datetime(2030, 1, 1, 0, 0, tzinfo=timezone.utc),
+        tick=False,
+    )
     async def test_update_task_title(self, service, created_task, user):
         dto = TaskUpdateDTO(title='Updated')
+        expected_updated = datetime(2030, 1, 1, 0, 0, tzinfo=timezone.utc)
 
         updated = await service.update_task(
             created_task.id, dto, user_id=user.id
@@ -144,10 +145,17 @@ class TestTaskServiceUpdate:
         assert updated.title == 'Updated'
         assert updated.description == created_task.description
         assert updated.is_done == created_task.is_done
+        assert updated.created_at == created_task.created_at
+        assert updated.updated_at == expected_updated
+        assert updated.updated_at != created_task.updated_at
+        assert updated.updated_at > created_task.updated_at
 
+        service.db.expire_all()
         task_in_db = await service.db.get(Task, created_task.id)
         assert task_in_db.title == 'Updated'
         assert task_in_db.description == created_task.description
+        assert task_in_db.created_at == created_task.created_at
+        assert task_in_db.updated_at == expected_updated
 
     async def test_update_task_description(self, service, created_task, user):
         dto = TaskUpdateDTO(description='new desc')
@@ -159,6 +167,12 @@ class TestTaskServiceUpdate:
         assert updated.description == 'new desc'
         assert updated.title == created_task.title
         assert updated.is_done == created_task.is_done
+
+        service.db.expire_all()
+        task_in_db = await service.db.get(Task, created_task.id)
+        assert task_in_db.description == 'new desc'
+        assert task_in_db.title == created_task.title
+        assert task_in_db.is_done == created_task.is_done
 
     async def test_update_task_clear_description(
         self, service, created_task, user
@@ -173,6 +187,12 @@ class TestTaskServiceUpdate:
         assert updated.description is None
         assert updated.title == created_task.title
 
+        service.db.expire_all()
+        task_in_db = await service.db.get(Task, created_task.id)
+        assert task_in_db.description is None
+        assert task_in_db.title == created_task.title
+        assert task_in_db.is_done == created_task.is_done
+
     async def test_update_task_is_done(self, service, created_task, user):
         dto = TaskUpdateDTO(is_done=True)
 
@@ -183,6 +203,12 @@ class TestTaskServiceUpdate:
         assert updated.is_done is True
         assert updated.title == created_task.title
         assert updated.description == created_task.description
+
+        service.db.expire_all()
+        task_in_db = await service.db.get(Task, created_task.id)
+        assert task_in_db.is_done is True
+        assert task_in_db.title == created_task.title
+        assert task_in_db.description == created_task.description
 
     async def test_update_task_unset_fields_not_changed(
         self, service, created_task, user
@@ -197,6 +223,12 @@ class TestTaskServiceUpdate:
         assert updated.title == 'Only title'
         assert updated.description == created_task.description
         assert updated.is_done == created_task.is_done
+
+        service.db.expire_all()
+        task_in_db = await service.db.get(Task, created_task.id)
+        assert task_in_db.title == 'Only title'
+        assert task_in_db.description == created_task.description
+        assert task_in_db.is_done == created_task.is_done
 
     async def test_update_task_foreign(self, service, created_task, other_user):
         dto = TaskUpdateDTO(title='Hacked')
@@ -252,16 +284,10 @@ class TestTaskServiceDelete:
 
         assert deleted is False
 
-
 class TestTaskServiceFilter:
-    async def test_filter_tasks_by_is_done(self, service, user):
-        await service.create_task(
-            TaskCreateDTO(title='Done', is_done=True), user_id=user.id
-        )
-        await service.create_task(
-            TaskCreateDTO(title='Not Done', is_done=False), user_id=user.id
-        )
-
+    async def test_filter_tasks_by_is_done(
+        self, service, user, tasks_with_mixed_done
+    ):
         result = await service.get_all_tasks(user_id=user.id, is_done=True)
 
         assert result.total == 1
@@ -270,14 +296,9 @@ class TestTaskServiceFilter:
         assert task.title == 'Done'
         assert task.is_done is True
 
-    async def test_filter_tasks_by_is_done_false(self, service, user):
-        await service.create_task(
-            TaskCreateDTO(title='Done', is_done=True), user_id=user.id
-        )
-        await service.create_task(
-            TaskCreateDTO(title='Not Done', is_done=False), user_id=user.id
-        )
-
+    async def test_filter_tasks_by_is_done_false(
+        self, service, user, tasks_with_mixed_done
+    ):
         result = await service.get_all_tasks(user_id=user.id, is_done=False)
 
         assert result.total == 1
