@@ -10,6 +10,12 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = 'HS256'
     JWT_EXPIRE_MINUTES: int = 120
 
+    REDIS_URL: str = 'redis://localhost:6379/0'
+    CACHE_TTL_SECONDS: int = 60
+    RATE_LIMIT_N: int = 60
+    RATE_LIMIT_T: int = 60
+    WEB_CONCURRENCY: int = 4
+
     model_config = SettingsConfigDict(
         env_file='.env',
         env_file_encoding='utf-8',
