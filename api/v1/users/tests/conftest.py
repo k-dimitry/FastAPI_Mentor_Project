@@ -35,3 +35,12 @@ def mock_user_service():
     app.dependency_overrides[get_user_service] = _override
     yield mock_service
     app.dependency_overrides.pop(get_user_service, None)
+
+
+@pytest_asyncio.fixture
+async def other_user(create_user_in_db):
+    """Второй обычный пользователь — для проверки изоляции доступа."""
+    return await create_user_in_db(
+        username='otheruser',
+        email='otheruser@example.com',
+    )
