@@ -1,6 +1,7 @@
 from datetime import date, datetime
 from typing import AsyncGenerator, Optional
 
+import fakeredis.aioredis
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
@@ -153,3 +154,12 @@ async def create_task_in_db(db_session: AsyncSession):
 @pytest_asyncio.fixture
 async def task_for_user(create_task_in_db, test_user):
     return await create_task_in_db(user_id=test_user.id)
+
+
+@pytest_asyncio.fixture
+async def fake_redis(monkeypatch):
+    """Заменяет common.redis_client._redis на in-memory FakeRedis."""
+    fake = fakeredis.aioredis.FakeRedis(decode_responses=True)
+    monkeypatch.setattr('common.redis_client._redis', fake, raising=False)
+    yield fake
+    await fake.aclose()
