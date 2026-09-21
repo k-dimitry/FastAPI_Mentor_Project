@@ -5,6 +5,7 @@ from sqlalchemy import and_, asc, case, desc, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from common.cache import get_cached, set_cached
 from tasks.dto import (
     TaskActiveUserDTO,
     TaskActiveUsersDTO,
@@ -89,8 +90,23 @@ class TaskService:
         order_by: str = 'created_at',
         direction: str = 'desc',
     ) -> TaskListDTO:
-        """Возвращает список задач с фильтрами,
-        поиском, сортировкой и пагинацией."""
+        """Возвращает список задач с фильтрами, поиском, сортировкой
+        и пагинацией. Кэширует результат в Redis (cache-first)."""
+        filters = {
+            'limit': limit,
+            'offset': offset,
+            'is_done': is_done,
+            'created_from': created_from.isoformat() if created_from else None,
+            'created_to': created_to.isoformat() if created_to else None,
+            'query': query,
+            'order_by': order_by,
+            'direction': direction,
+        }
+
+        cached = await get_cached(user_id, filters)
+        if cached is not None:
+            return cached
+
         conditions = [Task.user_id == user_id]
 
         if is_done is not None:
@@ -125,11 +141,18 @@ class TaskService:
         rows = result.all()
 
         if not rows:
-            return TaskListDTO(items=[], total=0, limit=limit, offset=offset)
+            result_dto = TaskListDTO(
+                items=[], total=0, limit=limit, offset=offset
+            )
+        else:
+            total = rows[0].total
+            items = [self._to_dto(row.Task) for row in rows]
+            result_dto = TaskListDTO(
+                items=items, total=total, limit=limit, offset=offset
+            )
 
-        total = rows[0].total
-        items = [self._to_dto(row.Task) for row in rows]
-        return TaskListDTO(items=items, total=total, limit=limit, offset=offset)
+        await set_cached(user_id, filters, result_dto)
+        return result_dto
 
     async def update_task(
         self, task_id: UUID, dto: TaskUpdateDTO, user_id: UUID
@@ -225,8 +248,7 @@ class TaskService:
 
     async def get_active_users(self, limit: int = 10) -> TaskActiveUsersDTO:
         """
-        Возвращает топ пользователей по числу невыполненных задач
-        (is_done=False).
+        Возвращает топ пользователей по числу невыполненных задач.
         """
         stmt = (
             select(
