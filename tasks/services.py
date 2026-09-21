@@ -5,7 +5,7 @@ from sqlalchemy import and_, asc, case, desc, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from common.cache import get_cached, set_cached
+from common.cache import get_cached, invalidate_user_lists, set_cached
 from tasks.dto import (
     TaskActiveUserDTO,
     TaskActiveUsersDTO,
@@ -49,7 +49,7 @@ class TaskService:
     async def create_task(
         self, dto: TaskCreateDTO, user_id: UUID
     ) -> TaskResponseDTO:
-        """Create Task and return DTO."""
+        """Create Task and return DTO. Инвалидирует кэш списка."""
         owner = user_id
         new_task = Task(
             title=dto.title,
@@ -66,6 +66,7 @@ class TaskService:
                 f"Task '{dto.title}' already exists for this user."
             )
         await self.db.refresh(new_task)
+        await invalidate_user_lists(user_id)
         return self._to_dto(new_task)
 
     async def get_task(
@@ -157,7 +158,8 @@ class TaskService:
     async def update_task(
         self, task_id: UUID, dto: TaskUpdateDTO, user_id: UUID
     ) -> TaskResponseDTO | None:
-        """Обновляет задачу, если принадлежит пользователю, иначе None."""
+        """Обновляет задачу, если принадлежит пользователю, иначе None.
+        Инвалидирует кэш списка."""
         task = await self._get_user_task(task_id, user_id)
         if task is None:
             return None
@@ -171,16 +173,19 @@ class TaskService:
 
         await self.db.commit()
         await self.db.refresh(task)
+        await invalidate_user_lists(user_id)
         return self._to_dto(task)
 
     async def delete_task(self, task_id: UUID, user_id: UUID) -> bool:
-        """Удаляет задачу, только если принадлежит пользователю."""
+        """Удаляет задачу, если принадлежит пользователю.
+        Инвалидирует кэш списка."""
         task = await self._get_user_task(task_id, user_id)
         if task is None:
             return False
 
         await self.db.delete(task)
         await self.db.commit()
+        await invalidate_user_lists(user_id)
         return True
 
     async def get_stats_total(
