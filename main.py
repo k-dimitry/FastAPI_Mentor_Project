@@ -1,5 +1,6 @@
 import logging.config
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
@@ -9,12 +10,21 @@ import users.models  # noqa
 from api.v1.router import router as v1_router
 from common.exceptions import AlreadyExistsError
 from common.middleware import log_requests
+from common.redis_client import close_redis, init_redis
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    await init_redis()
+    yield
+    await close_redis()
+
 
 logging.config.fileConfig(
     os.path.join(os.path.dirname(__file__), 'logging.ini'),
     disable_existing_loggers=False,
 )
-app = FastAPI()
+app = FastAPI(lifespan=lifespan)
 app.middleware('http')(log_requests)
 app.include_router(v1_router, prefix='/api')
 
