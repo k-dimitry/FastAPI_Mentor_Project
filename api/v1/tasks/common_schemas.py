@@ -1,8 +1,11 @@
 from datetime import datetime
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
+
+if TYPE_CHECKING:
+    from tasks.dto import TaskResponseDTO
 
 
 class TaskBase(BaseModel):
@@ -20,7 +23,6 @@ class TaskResponse(TaskBase):
 
     @classmethod
     def from_dto(cls, dto: 'TaskResponseDTO') -> 'TaskResponse':
-
         return cls(
             id=dto.id,
             title=dto.title,

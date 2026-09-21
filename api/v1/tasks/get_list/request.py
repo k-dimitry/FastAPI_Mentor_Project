@@ -1,6 +1,11 @@
+from typing import TYPE_CHECKING
+
 from pydantic import BaseModel
 
 from api.v1.tasks.common_schemas import TaskResponse
+
+if TYPE_CHECKING:
+    from tasks.dto import TaskListDTO
 
 
 class TaskListResponse(BaseModel):
@@ -16,7 +21,6 @@ class TaskListResponse(BaseModel):
         next_url: str | None = None,
         previous_url: str | None = None,
     ) -> 'TaskListResponse':
-
         return cls(
             result=[TaskResponse.from_dto(item) for item in dto.items],
             count=dto.total,

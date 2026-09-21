@@ -44,7 +44,6 @@ exclude = [
 select = ["E", "F", "I"]
 fixable = ["ALL"]
 unfixable = []
-ignore = ["F821"]
 
 [tool.ruff.format]
 # Enable preview-style formatting

@@ -21,7 +21,7 @@ class GetListTaskQuery(BaseModel):
         Query(
             None,
             description='Дата создания от (включительно)',
-            examples=['2026-08-26T00:00:00Z'],
+            json_schema_extra={'example': '2026-08-26T00:00:00Z'},
         ),
     ] = None
     created_to: Annotated[
@@ -29,7 +29,7 @@ class GetListTaskQuery(BaseModel):
         Query(
             None,
             description='Дата создания до (включительно)',
-            examples=['2026-08-26T23:59:59Z'],
+            json_schema_extra={'example': '2026-08-26T23:59:59Z'},
         ),
     ] = None
     query: Annotated[
