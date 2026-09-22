@@ -18,6 +18,7 @@ jobs:
     env:
       DATABASE_URL: postgresql+asyncpg://test:test@localhost:5432/test
       JWT_SECRET_KEY: test-secret-key-for-ci-only-min-32-chars
+      REDIS_URL: redis://localhost:6379/0
     steps:
       - uses: actions/checkout@v4
 
