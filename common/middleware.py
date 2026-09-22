@@ -2,8 +2,13 @@ import json
 import logging
 from time import perf_counter
 
-from fastapi import Request
+from fastapi import Request, status
 from fastapi.concurrency import iterate_in_threadpool
+from fastapi.responses import JSONResponse
+
+from common.redis_client import get_redis
+from common.security import decode_access_token
+from config import settings
 
 logger = logging.getLogger('app')
 
@@ -59,6 +64,58 @@ def _safe_json_loads(body: bytes):
         return json.loads(body)
     except (json.JSONDecodeError, UnicodeDecodeError):
         return body.decode('utf-8', errors='replace')
+
+
+def _get_rate_limit_identifier(request: Request) -> str:
+    """Возвращает идентификатор для rate limit: user_id (из JWT) или IP."""
+    auth = request.headers.get('authorization', '')
+    if auth.lower().startswith('bearer '):
+        token = auth[7:]
+        payload = decode_access_token(token)
+        if payload and (sub := payload.get('sub')):
+            return f'user:{sub}'
+
+    host = request.client.host if request.client else 'unknown'
+    return f'ip:{host}'
+
+
+async def rate_limit(request: Request, call_next):
+    """Ограничивает число запросов с одного идентификатора (fixed window)."""
+    if not request.url.path.startswith('/api/'):
+        return await call_next(request)
+
+    redis = get_redis()
+    if redis is None:
+        return await call_next(request)
+
+    identifier = _get_rate_limit_identifier(request)
+    key = f'rl:{identifier}'
+
+    try:
+        count = await redis.incr(key)
+        if count == 1:
+            await redis.expire(key, settings.RATE_LIMIT_T)
+            ttl = settings.RATE_LIMIT_T
+        else:
+            ttl = await redis.ttl(key)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning('Rate limit check failed for %s: %s', identifier, exc)
+        return await call_next(request)
+
+    if count > settings.RATE_LIMIT_N:
+        return JSONResponse(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            content={
+                'detail': 'Too many requests',
+                'limit': settings.RATE_LIMIT_N,
+                'window': settings.RATE_LIMIT_T,
+            },
+            headers={
+                'Retry-After': str(ttl if ttl > 0 else settings.RATE_LIMIT_T),
+            },
+        )
+
+    return await call_next(request)
 
 
 async def log_requests(request: Request, call_next):

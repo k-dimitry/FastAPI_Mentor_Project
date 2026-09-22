@@ -9,7 +9,7 @@ import tasks.models  # noqa
 import users.models  # noqa
 from api.v1.router import router as v1_router
 from common.exceptions import AlreadyExistsError
-from common.middleware import log_requests
+from common.middleware import log_requests, rate_limit
 from common.redis_client import close_redis, init_redis
 
 
@@ -25,6 +25,7 @@ logging.config.fileConfig(
     disable_existing_loggers=False,
 )
 app = FastAPI(lifespan=lifespan)
+app.middleware('http')(rate_limit)
 app.middleware('http')(log_requests)
 app.include_router(v1_router, prefix='/api')
 
