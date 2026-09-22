@@ -6,17 +6,19 @@ requires-python = ">=3.12"
 dependencies = [
     "alembic>=1.18.5",
     "asyncpg>=0.31.0",
+    "celery[redis]>=5.4.0",
     "fastapi>=0.140.0",
     "gunicorn>=23.0.0",
     "passlib[bcrypt]>=1.7.4",
+    "psycopg2-binary>=2.9.10",
     "pydantic[email]>=2.13.4",
     "pydantic-settings>=2.14.2",
     "python-dotenv>=1.2.2",
+    "python-jose[cryptography]>=3.5.0",
+    "python-multipart>=0.0.32",
     "redis[hiredis]>=5.0.0",
     "sqlalchemy>=2.0.51",
     "uvicorn>=0.51.0",
-    "python-jose[cryptography]>=3.5.0",
-    "python-multipart>=0.0.32",
 ]
 
 

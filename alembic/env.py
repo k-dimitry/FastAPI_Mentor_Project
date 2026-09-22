@@ -8,8 +8,10 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
 from config import settings
 from database import Base
+from notifications.models import Notification  # noqa
 from tasks.models import Task  # noqa
 from users.models import User  # noqa
+from common.mixins import UTCDateTime
 
 target_metadata = Base.metadata
 
@@ -22,6 +24,13 @@ config.set_main_option('sqlalchemy.url', str(settings.DATABASE_URL))
 
 target_metadata = Base.metadata
 
+
+def render_item(type_, obj, autogen_context):
+    """Говорит Alembic рендерить UTCDateTime как sa.DateTime(timezone=True)."""
+    if type_ == 'type' and isinstance(obj, UTCDateTime):
+        autogen_context.imports.add('import sqlalchemy as sa')
+        return 'sa.DateTime(timezone=True)'
+    return False  # default rendering
 
 def run_migrations_offline() -> None:
     url = config.get_main_option('sqlalchemy.url')
@@ -37,8 +46,11 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection: Connection) -> None:
-    context.configure(connection=connection, target_metadata=target_metadata)
-
+    context.configure(
+        connection=connection,
+        target_metadata=target_metadata,
+        render_item=render_item,
+    )
     with context.begin_transaction():
         context.run_migrations()
 

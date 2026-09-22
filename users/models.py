@@ -11,6 +11,7 @@ from common.mixins import TimestampMixin
 from database import Base
 
 if TYPE_CHECKING:
+    from notifications.models import Notification
     from tasks.models import Task
 
 
@@ -30,4 +31,7 @@ class User(TimestampMixin, Base):
     is_admin: Mapped[bool] = mapped_column(
         default=False,
         server_default=text('false'),
+    )
+    notifications: Mapped[list['Notification']] = relationship(
+        'Notification', back_populates='user'
     )

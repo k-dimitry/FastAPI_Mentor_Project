@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 
+import notifications.models  # noqa
 import tasks.models  # noqa
 import users.models  # noqa
 from api.v1.router import router as v1_router
