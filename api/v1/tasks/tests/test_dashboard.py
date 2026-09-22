@@ -1,13 +1,12 @@
 from datetime import datetime, timezone
 
-import pytest
 from fastapi import status
 from httpx import AsyncClient
 
 
 class TestDashboardUser:
     async def test_user_sees_only_own(
-            self, client, user_token, create_task_in_db, test_user, other_user
+        self, client, user_token, create_task_in_db, test_user, other_user
     ):
         day = datetime(2026, 9, 14, 12, 0, 0, tzinfo=timezone.utc)
         await create_task_in_db(
@@ -39,7 +38,7 @@ class TestDashboardUser:
             'total': {
                 'done_count': 1,
                 'not_done_count': 1,
-                'done_percent': 50.0,
+                'done_percent': '50.00',
             },
             'by_day': {
                 'items': [
@@ -64,7 +63,7 @@ class TestDashboardUser:
             'total': {
                 'done_count': 0,
                 'not_done_count': 0,
-                'done_percent': 0.0,
+                'done_percent': '0.00',
             },
             'by_day': {'items': []},
         }
@@ -72,13 +71,13 @@ class TestDashboardUser:
 
 class TestDashboardAdmin:
     async def test_admin_sees_global(
-            self,
-            client,
-            admin_token,
-            create_task_in_db,
-            test_user,
-            other_user,
-            admin_user,
+        self,
+        client,
+        admin_token,
+        create_task_in_db,
+        test_user,
+        other_user,
+        admin_user,
     ):
         day = datetime(2026, 9, 14, 12, 0, 0, tzinfo=timezone.utc)
         await create_task_in_db(
@@ -110,7 +109,7 @@ class TestDashboardAdmin:
             'total': {
                 'done_count': 2,
                 'not_done_count': 1,
-                'done_percent': pytest.approx(66.67, abs=0.01),
+                'done_percent': '66.67',
             },
             'by_day': {
                 'items': [
@@ -125,12 +124,12 @@ class TestDashboardAdmin:
         }
 
     async def test_admin_sees_global_even_with_own_tasks(
-            self,
-            client,
-            admin_token,
-            create_task_in_db,
-            test_user,
-            admin_user,
+        self,
+        client,
+        admin_token,
+        create_task_in_db,
+        test_user,
+        admin_user,
     ):
         day = datetime(2026, 9, 14, 12, 0, 0, tzinfo=timezone.utc)
         await create_task_in_db(
@@ -149,7 +148,7 @@ class TestDashboardAdmin:
         assert response.json()['total'] == {
             'done_count': 1,
             'not_done_count': 0,
-            'done_percent': 100.0,
+            'done_percent': '100.00',
         }
         assert response.json()['by_day']['items'] == [
             {
@@ -160,9 +159,7 @@ class TestDashboardAdmin:
             }
         ]
 
-    async def test_admin_empty(
-            self, client, admin_token, admin_user
-    ):
+    async def test_admin_empty(self, client, admin_token, admin_user):
         response = await client.get(
             '/api/v1/tasks/dashboard',
             headers={'Authorization': f'Bearer {admin_token}'},
@@ -173,7 +170,7 @@ class TestDashboardAdmin:
             'total': {
                 'done_count': 0,
                 'not_done_count': 0,
-                'done_percent': 0.0,
+                'done_percent': '0.00',
             },
             'by_day': {'items': []},
         }

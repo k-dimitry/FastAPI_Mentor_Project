@@ -53,7 +53,7 @@ class TaskListDTO:
 class TaskStatsTotalDTO:
     done_count: int
     not_done_count: int
-    done_percent: float
+    done_percent: str
 
 
 @dataclass(slots=True, frozen=True)

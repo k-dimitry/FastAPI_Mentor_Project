@@ -2,15 +2,9 @@ import asyncio
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
-from common.cache import (
-    _cache_key,
-    _decode,
-    _encode,
-    get_cached,
-    invalidate_user_lists,
-    set_cached,
-)
+from common.cache import Cache
 from config import settings
+from tasks.cache import TaskListCache
 from tasks.dto import TaskListDTO, TaskResponseDTO
 from tasks.models import Task
 
@@ -32,128 +26,203 @@ def _make_dto(total: int = 1) -> TaskListDTO:
     return TaskListDTO(items=items, total=total, limit=20, offset=0)
 
 
-class TestCacheKey:
+
+
+class TestGenericCache:
+    async def test_get_miss_on_empty(self, fake_redis):
+        c = Cache()
+        assert await c.get('nope') is None
+
+    async def test_set_then_get(self, fake_redis):
+        c = Cache()
+        await c.set('k', 'v', ttl=60)
+        assert await c.get('k') == 'v'
+
+    async def test_delete(self, fake_redis):
+        c = Cache()
+        await c.set('k', 'v', ttl=60)
+        await c.delete('k')
+        assert await c.get('k') is None
+
+    async def test_delete_pattern(self, fake_redis):
+        c = Cache()
+        await c.set('a:1', 'v1', ttl=60)
+        await c.set('a:2', 'v2', ttl=60)
+        await c.set('b:1', 'v3', ttl=60)
+        await c.delete_pattern('a:*')
+        assert await c.get('a:1') is None
+        assert await c.get('a:2') is None
+        assert await c.get('b:1') == 'v3'
+
+
+
+
+class TestTaskListCacheKey:
     def test_same_filters_same_key(self):
         user_id = uuid4()
         filters = {'limit': 20, 'offset': 0, 'order_by': 'created_at'}
-        assert _cache_key(user_id, filters) == _cache_key(user_id, filters)
+        k1 = TaskListCache._make_key(user_id, filters)
+        k2 = TaskListCache._make_key(user_id, filters)
+        assert k1 == k2
 
     def test_key_format(self):
         user_id = uuid4()
-        key = _cache_key(user_id, {'limit': 20})
+        key = TaskListCache._make_key(user_id, {'limit': 20})
         assert key.startswith(f'task:list:{user_id}:')
         suffix = key.rsplit(':', 1)[-1]
-        assert len(suffix) == 16  # sha1[:16]
+        assert len(suffix) == 16
 
     def test_different_filters_different_key(self):
         user_id = uuid4()
-        k1 = _cache_key(user_id, {'limit': 20})
-        k2 = _cache_key(user_id, {'limit': 50})
+        k1 = TaskListCache._make_key(user_id, {'limit': 20})
+        k2 = TaskListCache._make_key(user_id, {'limit': 50})
         assert k1 != k2
 
     def test_filters_order_irrelevant(self):
         user_id = uuid4()
-        k1 = _cache_key(user_id, {'limit': 20, 'offset': 0})
-        k2 = _cache_key(user_id, {'offset': 0, 'limit': 20})
+        k1 = TaskListCache._make_key(user_id, {'limit': 20, 'offset': 0})
+        k2 = TaskListCache._make_key(user_id, {'offset': 0, 'limit': 20})
         assert k1 == k2
 
     def test_different_users_different_key(self):
         filters = {'limit': 20}
-        assert _cache_key(uuid4(), filters) != _cache_key(uuid4(), filters)
+        k1 = TaskListCache._make_key(uuid4(), filters)
+        k2 = TaskListCache._make_key(uuid4(), filters)
+        assert k1 != k2
 
 
-class TestCacheSerialization:
+
+
+class TestTaskListCacheSerialization:
     def test_roundtrip_empty(self):
         dto = TaskListDTO(items=[], total=0, limit=20, offset=0)
-        assert _decode(_encode(dto)) == dto
+        assert TaskListCache._decode(TaskListCache._encode(dto)) == dto
 
     def test_roundtrip_with_items(self):
         dto = _make_dto(total=3)
-        assert _decode(_encode(dto)) == dto
+        assert TaskListCache._decode(TaskListCache._encode(dto)) == dto
 
     def test_roundtrip_preserves_types(self):
         dto = _make_dto(total=1)
-        item = _decode(_encode(dto)).items[0]
+        item = TaskListCache._decode(TaskListCache._encode(dto)).items[0]
         assert isinstance(item.id, UUID)
         assert isinstance(item.created_at, datetime)
         assert item.created_at.tzinfo is not None
 
 
-class TestCacheGetSet:
+
+
+class TestTaskListCacheGetSet:
     async def test_get_miss_on_empty(self, fake_redis):
-        assert await get_cached(uuid4(), {'limit': 20}) is None
+        tlc = TaskListCache()
+        assert await tlc.get(uuid4(), {'limit': 20}) is None
 
     async def test_set_then_get_hit(self, fake_redis):
+        tlc = TaskListCache()
         user_id = uuid4()
         filters = {'limit': 20, 'offset': 0}
         original = _make_dto(total=2)
 
-        await set_cached(user_id, filters, original)
-        restored = await get_cached(user_id, filters)
+        await tlc.set(user_id, filters, original)
+        restored = await tlc.get(user_id, filters)
 
         assert restored == original
 
-    async def test_set_sets_ttl(self, fake_redis):
+    async def test_set_sets_default_ttl(self, fake_redis):
+        tlc = TaskListCache()
         user_id = uuid4()
         filters = {'limit': 20}
-        await set_cached(user_id, filters, _make_dto())
+        await tlc.set(user_id, filters, _make_dto())
 
-        key = _cache_key(user_id, filters)
+        key = TaskListCache._make_key(user_id, filters)
         ttl = await fake_redis.ttl(key)
         assert 0 < ttl <= settings.CACHE_TTL_SECONDS
 
-    async def test_ttl_expires(self, fake_redis, monkeypatch):
-        monkeypatch.setattr(settings, 'CACHE_TTL_SECONDS', 1)
+    async def test_set_ttl_override(self, fake_redis):
+        tlc = TaskListCache()
+        user_id = uuid4()
+        filters = {'limit': 20}
+        await tlc.set(user_id, filters, _make_dto(), ttl=100)
+
+        key = TaskListCache._make_key(user_id, filters)
+        ttl = await fake_redis.ttl(key)
+        assert ttl > settings.CACHE_TTL_SECONDS
+
+    async def test_ttl_expires(self, fake_redis):
+        tlc = TaskListCache()
         user_id = uuid4()
         filters = {'limit': 20}
 
-        await set_cached(user_id, filters, _make_dto())
-        assert await get_cached(user_id, filters) is not None
+        await tlc.set(user_id, filters, _make_dto(), ttl=1)
+        assert await tlc.get(user_id, filters) is not None
 
         await asyncio.sleep(1.1)
 
-        assert await get_cached(user_id, filters) is None
+        assert await tlc.get(user_id, filters) is None
 
-
-class TestCacheInvalidation:
-    async def test_invalidate_removes_user_keys(self, fake_redis):
+    async def test_corrupted_data_removed(self, fake_redis):
+        tlc = TaskListCache()
         user_id = uuid4()
-        await set_cached(user_id, {'limit': 20}, _make_dto())
-        await set_cached(user_id, {'limit': 50}, _make_dto())
+        filters = {'limit': 20}
+        key = TaskListCache._make_key(user_id, filters)
+
+        await fake_redis.set(key, 'not-a-json')
+
+        assert await tlc.get(user_id, filters) is None
+        assert await fake_redis.get(key) is None
+
+
+
+
+class TestTaskListCacheInvalidation:
+    async def test_invalidate_removes_user_keys(self, fake_redis):
+        tlc = TaskListCache()
+        user_id = uuid4()
+        await tlc.set(user_id, {'limit': 20}, _make_dto())
+        await tlc.set(user_id, {'limit': 50}, _make_dto())
         assert len(await fake_redis.keys('task:list:*')) == 2
 
-        await invalidate_user_lists(user_id)
+        await tlc.invalidate_user_lists(user_id)
 
         assert await fake_redis.keys('task:list:*') == []
 
     async def test_invalidate_only_matching_user(self, fake_redis):
+        tlc = TaskListCache()
         user_a = uuid4()
         user_b = uuid4()
-        await set_cached(user_a, {'limit': 20}, _make_dto())
-        await set_cached(user_b, {'limit': 20}, _make_dto())
+        await tlc.set(user_a, {'limit': 20}, _make_dto())
+        await tlc.set(user_b, {'limit': 20}, _make_dto())
 
-        await invalidate_user_lists(user_a)
+        await tlc.invalidate_user_lists(user_a)
 
         remaining = await fake_redis.keys('task:list:*')
         assert len(remaining) == 1
         assert str(user_b) in remaining[0]
 
     async def test_invalidate_missing_key_noop(self, fake_redis):
-        await invalidate_user_lists(uuid4())
+        tlc = TaskListCache()
+        await tlc.invalidate_user_lists(uuid4())
+
+
 
 
 class TestCacheGracefulDegrade:
-    async def test_get_cached_without_redis(self, monkeypatch):
+    async def test_get_without_redis(self, monkeypatch):
         monkeypatch.setattr('common.redis_client._redis', None)
-        assert await get_cached(uuid4(), {'limit': 20}) is None
+        tlc = TaskListCache()
+        assert await tlc.get(uuid4(), {'limit': 20}) is None
 
-    async def test_set_cached_without_redis(self, monkeypatch):
+    async def test_set_without_redis(self, monkeypatch):
         monkeypatch.setattr('common.redis_client._redis', None)
-        await set_cached(uuid4(), {'limit': 20}, _make_dto())
+        tlc = TaskListCache()
+        await tlc.set(uuid4(), {'limit': 20}, _make_dto())
 
     async def test_invalidate_without_redis(self, monkeypatch):
         monkeypatch.setattr('common.redis_client._redis', None)
-        await invalidate_user_lists(uuid4())
+        tlc = TaskListCache()
+        await tlc.invalidate_user_lists(uuid4())
+
+
 
 
 class TestTaskServiceCache:
@@ -169,7 +238,9 @@ class TestTaskServiceCache:
         keys = await fake_redis.keys('task:list:*')
         assert len(keys) == 1
 
-    async def test_service_caches_empty_result(self, fake_redis, service, user):
+    async def test_service_caches_empty_result(
+        self, fake_redis, service, user
+    ):
         result = await service.get_all_tasks(user_id=user.id)
 
         assert result.total == 0

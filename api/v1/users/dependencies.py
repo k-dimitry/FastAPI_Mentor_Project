@@ -19,21 +19,22 @@ async def get_user_with_access_check(
     service: UserService = Depends(get_user_service),
     current_user: UserResponseDTO = Depends(get_current_user),
 ) -> UserResponseDTO:
-    """Проверяет права доступа и возвращает запрашиваемого пользователя."""
-    if not is_author_or_admin(
-        current_user_id=current_user.id,
-        target_user_id=user_id,
-        is_admin=current_user.is_admin,
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail='Not enough permissions to view this user',
-        )
-
+    """Возвращает пользователя, если у текущего есть доступ."""
     user_dto = await service.get_user(user_id)
     if user_dto is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail='User not found',
         )
+
+    if not is_author_or_admin(
+        current_user_id=current_user.id,
+        target_user_id=user_id,
+        is_admin=current_user.is_admin,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail='User not found',
+        )
+
     return user_dto

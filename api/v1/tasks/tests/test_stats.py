@@ -6,7 +6,7 @@ from httpx import AsyncClient
 
 
 class TestTaskStatsTotal:
-    async def test_user_sees_only_own(
+    async def test_user_sees_only_own_tasks(
             self, client, user_token, create_task_in_db, test_user, other_user
     ):
         await create_task_in_db(
@@ -31,10 +31,10 @@ class TestTaskStatsTotal:
         assert response.json() == {
             'done_count': 1,
             'not_done_count': 1,
-            'done_percent': 50.0,
+            'done_percent': '50.00',
         }
 
-    async def test_admin_sees_only_own(
+    async def test_admin_sees_only_own_tasks(
             self, client, admin_token, create_task_in_db, test_user
     ):
         await create_task_in_db(
@@ -53,7 +53,7 @@ class TestTaskStatsTotal:
         assert response.json() == {
             'done_count': 0,
             'not_done_count': 0,
-            'done_percent': 0.0,
+            'done_percent': '0.00',
         }
 
     async def test_done_percent_calculation(
@@ -81,7 +81,7 @@ class TestTaskStatsTotal:
         assert response.json() == {
             'done_count': 3,
             'not_done_count': 1,
-            'done_percent': 75.0,
+            'done_percent': '75.00',
         }
 
     async def test_empty(self, client, user_token, test_user):
@@ -94,7 +94,7 @@ class TestTaskStatsTotal:
         assert response.json() == {
             'done_count': 0,
             'not_done_count': 0,
-            'done_percent': 0.0,
+            'done_percent': '0.00',
         }
 
 

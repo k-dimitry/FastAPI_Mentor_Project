@@ -1,11 +1,12 @@
 from datetime import datetime
+from decimal import ROUND_HALF_UP, Decimal
 from uuid import UUID
 
 from sqlalchemy import and_, asc, case, desc, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from common.cache import get_cached, invalidate_user_lists, set_cached
+from tasks.cache import TaskListCache
 from tasks.dto import (
     TaskActiveUserDTO,
     TaskActiveUsersDTO,
@@ -25,6 +26,7 @@ from users.models import User
 class TaskService:
     def __init__(self, db: AsyncSession):
         self.db = db
+        self._tasks_cache = TaskListCache()
 
     @staticmethod
     def _to_dto(task: Task) -> TaskResponseDTO:
@@ -66,7 +68,7 @@ class TaskService:
                 f"Task '{dto.title}' already exists for this user."
             )
         await self.db.refresh(new_task)
-        await invalidate_user_lists(user_id)
+        await self._tasks_cache.invalidate_user_lists(user_id)
         return self._to_dto(new_task)
 
     async def get_task(
@@ -90,6 +92,7 @@ class TaskService:
         query: str | None = None,
         order_by: str = 'created_at',
         direction: str = 'desc',
+        cache_ttl: int | None = None,
     ) -> TaskListDTO:
         """Возвращает список задач с фильтрами, поиском, сортировкой
         и пагинацией. Кэширует результат в Redis (cache-first)."""
@@ -104,7 +107,7 @@ class TaskService:
             'direction': direction,
         }
 
-        cached = await get_cached(user_id, filters)
+        cached = await self._tasks_cache.get(user_id, filters)
         if cached is not None:
             return cached
 
@@ -152,7 +155,7 @@ class TaskService:
                 items=items, total=total, limit=limit, offset=offset
             )
 
-        await set_cached(user_id, filters, result_dto)
+        await self._tasks_cache.set(user_id, filters, result_dto)
         return result_dto
 
     async def update_task(
@@ -173,7 +176,7 @@ class TaskService:
 
         await self.db.commit()
         await self.db.refresh(task)
-        await invalidate_user_lists(user_id)
+        await self._tasks_cache.invalidate_user_lists(user_id)
         return self._to_dto(task)
 
     async def delete_task(self, task_id: UUID, user_id: UUID) -> bool:
@@ -185,7 +188,7 @@ class TaskService:
 
         await self.db.delete(task)
         await self.db.commit()
-        await invalidate_user_lists(user_id)
+        await self._tasks_cache.invalidate_user_lists(user_id)
         return True
 
     async def get_stats_total(
@@ -209,7 +212,15 @@ class TaskService:
         done = row.done_count or 0
         not_done = row.not_done_count or 0
         total = done + not_done
-        done_percent = round((done / total) * 100, 2) if total else 0.0
+
+        if total:
+            done_percent = str(
+                (Decimal(done) / Decimal(total) * 100).quantize(
+                    Decimal('0.01'), rounding=ROUND_HALF_UP
+                )
+            )
+        else:
+            done_percent = '0.00'
 
         return TaskStatsTotalDTO(
             done_count=done,

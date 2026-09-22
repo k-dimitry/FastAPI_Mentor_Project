@@ -178,3 +178,5 @@ dmypy.json
 cython_debug/
 .env.docker
 
+.changelog
+changelog

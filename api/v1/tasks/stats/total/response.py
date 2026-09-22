@@ -6,7 +6,7 @@ from tasks.dto import TaskStatsTotalDTO
 class TaskStatsTotalResponse(BaseModel):
     done_count: int
     not_done_count: int
-    done_percent: float
+    done_percent: str
 
     @classmethod
     def from_dto(cls, dto: TaskStatsTotalDTO) -> 'TaskStatsTotalResponse':
