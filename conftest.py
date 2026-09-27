@@ -1,5 +1,6 @@
 from datetime import date, datetime
 from typing import AsyncGenerator, Optional
+from unittest.mock import MagicMock
 
 import fakeredis.aioredis
 import pytest
@@ -15,6 +16,7 @@ from sqlalchemy.pool import StaticPool
 from common.security import create_access_token, hash_password
 from database import Base, get_db
 from main import app
+from notifications.tasks import send_welcome_notification
 from tasks.models import Task
 from users.models import User
 
@@ -163,3 +165,8 @@ async def fake_redis(monkeypatch):
     monkeypatch.setattr('common.redis_client._redis', fake, raising=False)
     yield fake
     await fake.aclose()
+
+
+@pytest.fixture(autouse=True)
+def _mock_welcome_delay(monkeypatch):
+    monkeypatch.setattr(send_welcome_notification, 'delay', MagicMock())

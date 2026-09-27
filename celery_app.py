@@ -1,8 +1,17 @@
+import logging.config
+import os
+
 from celery import Celery
 from celery.signals import worker_ready
 
 from common.sync_db import check_sync_connection
 from config import settings
+
+logging.config.fileConfig(
+    os.path.join(os.path.dirname(__file__), 'logging.ini'),
+    disable_existing_loggers=False,
+)
+
 
 celery_app = Celery(
     'fastapi_mentor',
@@ -20,6 +29,7 @@ celery_app.conf.update(
     task_track_started=True,
     task_always_eager=settings.CELERY_TASK_ALWAYS_EAGER,
     task_eager_propagates=True,
+    worker_hijack_root_logger=False,
 )
 
 celery_app.autodiscover_tasks(['notifications'], force=True)
