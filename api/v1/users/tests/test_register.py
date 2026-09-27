@@ -2,15 +2,20 @@ import uuid
 from datetime import date, datetime, timezone
 
 import pytest
+import time_machine
 from fastapi import status
 from httpx import AsyncClient
+from sqlalchemy import select
 
 from api.v1.users.tests.conftest import CORRECT_PASSWORD
+from notifications.models import Notification
 from users.dto import UserCreateDTO, UserResponseDTO
 from users.models import User
 
 
 class TestUserRegisterSuccess:
+    url = '/api/v1/users/register'
+
     async def test_register_success(
         self, client: AsyncClient, mock_user_service
     ):
@@ -39,7 +44,7 @@ class TestUserRegisterSuccess:
             'birthdate': '1995-01-01',
         }
 
-        response = await client.post('/api/v1/users/register', json=payload)
+        response = await client.post(self.url, json=payload)
 
         assert response.status_code == status.HTTP_201_CREATED
         data = response.json()
@@ -81,7 +86,7 @@ class TestUserRegisterSuccess:
             'birthdate': '1995-01-01',
         }
 
-        response = await client.post('/api/v1/users/register', json=payload)
+        response = await client.post(self.url, json=payload)
 
         assert response.status_code == status.HTTP_201_CREATED
         user_id = uuid.UUID(response.json()['id'])
@@ -99,6 +104,37 @@ class TestUserRegisterSuccess:
         assert user_in_db.hashed_password != CORRECT_PASSWORD
         assert len(user_in_db.hashed_password) > 20
 
+    @time_machine.travel(
+        datetime(2026, 8, 30, 12, 30, tzinfo=timezone.utc),
+        tick=False,
+    )
+    async def test_register_creates_welcome_notification(
+        self, client: AsyncClient, db_session
+    ):
+        fixed_dt = datetime(2026, 8, 30, 12, 30, tzinfo=timezone.utc)
+        payload = {
+            'username': 'welcomeuser',
+            'email': 'welcome@example.com',
+            'first_name': 'Welcome',
+            'last_name': 'User',
+            'password': CORRECT_PASSWORD,
+            'birthdate': '1995-01-01',
+        }
+
+        response = await client.post(self.url, json=payload)
+
+        assert response.status_code == status.HTTP_201_CREATED
+        user_id = uuid.UUID(response.json()['id'])
+
+        db_session.expire_all()
+        result = await db_session.execute(select(Notification))
+        notification = result.scalar_one()
+
+        assert isinstance(notification.id, uuid.UUID)
+        assert notification.user_id == user_id
+        assert notification.message == 'Welcome, welcomeuser!'
+        assert notification.sent_at == fixed_dt
+
     async def test_register_without_birthdate(self, client: AsyncClient):
         payload = {
             'username': 'nobirth',
@@ -108,13 +144,14 @@ class TestUserRegisterSuccess:
             'password': CORRECT_PASSWORD,
         }
 
-        response = await client.post('/api/v1/users/register', json=payload)
+        response = await client.post(self.url, json=payload)
 
         assert response.status_code == status.HTTP_201_CREATED
         assert response.json()['birthdate'] is None
 
 
 class TestUserRegisterDuplicate:
+    url = '/api/v1/users/register'
     @pytest.mark.parametrize(
         'username,email,expected_detail',
         [
@@ -154,13 +191,14 @@ class TestUserRegisterDuplicate:
             'birthdate': '1995-01-01',
         }
 
-        response = await client.post('/api/v1/users/register', json=payload)
+        response = await client.post(self.url, json=payload)
 
         assert response.status_code == status.HTTP_409_CONFLICT
         assert response.json() == {'detail': expected_detail}
 
 
 class TestUserRegisterValidation:
+    url = '/api/v1/users/register'
     @pytest.mark.parametrize(
         'password,expected_error',
         [
@@ -280,7 +318,7 @@ class TestUserRegisterValidation:
             'birthdate': '1995-01-01',
         }
 
-        response = await client.post('/api/v1/users/register', json=payload)
+        response = await client.post(self.url, json=payload)
 
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
         assert response.json() == {'detail': [expected_error]}
@@ -350,7 +388,7 @@ class TestUserRegisterValidation:
             field: value,
         }
 
-        response = await client.post('/api/v1/users/register', json=payload)
+        response = await client.post(self.url, json=payload)
 
         assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
         body = response.json()

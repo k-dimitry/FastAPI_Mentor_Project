@@ -1,27 +1,32 @@
+from contextlib import contextmanager
 from datetime import date, datetime
 from typing import AsyncGenerator, Optional
-from unittest.mock import MagicMock
 
 import fakeredis.aioredis
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
     create_async_engine,
 )
+from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from celery_app import celery_app
 from common.security import create_access_token, hash_password
 from database import Base, get_db
 from main import app
-from notifications.tasks import send_welcome_notification
 from tasks.models import Task
 from users.models import User
 
 TEST_DATABASE_URL = (
     'sqlite+aiosqlite:///file:memdb1?mode=memory&cache=shared&uri=true'
+)
+SYNC_TEST_DATABASE_URL = (
+    'sqlite:///file:memdb1?mode=memory&cache=shared&uri=true'
 )
 engine = create_async_engine(
     TEST_DATABASE_URL,
@@ -168,5 +173,33 @@ async def fake_redis(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
-def _mock_welcome_delay(monkeypatch):
-    monkeypatch.setattr(send_welcome_notification, 'delay', MagicMock())
+def celery_eager(monkeypatch):
+    """Задачи Celery выполняются синхронно в той же SQLite, что и API-тесты."""
+    celery_app.conf.task_always_eager = True
+    celery_app.conf.task_eager_propagates = True
+
+    sync_engine = create_engine(
+        SYNC_TEST_DATABASE_URL,
+        connect_args={'check_same_thread': False},
+        poolclass=StaticPool,
+    )
+    sync_session_local = sessionmaker(
+        bind=sync_engine,
+        expire_on_commit=False,
+        autoflush=False,
+    )
+
+    @contextmanager
+    def _get_sync_session():
+        session = sync_session_local()
+        try:
+            yield session
+        finally:
+            session.close()
+
+    monkeypatch.setattr(
+        'notifications.tasks.get_sync_session',
+        _get_sync_session,
+    )
+    yield
+    sync_engine.dispose()
