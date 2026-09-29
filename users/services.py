@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from notifications.tasks import send_welcome_notification
 from users.dto import UserCreateDTO, UserResponseDTO
 from users.exceptions import UserAlreadyExistsError
 from users.models import User
@@ -50,6 +51,7 @@ class UserService:
                 f"User '{dto.username}' or email '{dto.email}' already exists."
             )
         await self.db.refresh(user)
+        send_welcome_notification.delay(user.id)
         return self._to_dto(user)
 
     async def get_user(self, user_id: UUID) -> UserResponseDTO | None:

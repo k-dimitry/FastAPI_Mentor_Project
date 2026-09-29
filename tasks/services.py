@@ -1,11 +1,13 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from uuid import UUID
 
-from sqlalchemy import and_, asc, case, desc, func, or_, select
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import and_, asc, case, delete, desc, func, or_, select
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from common.mixins import utc_now
+from common.sync_db import get_sync_session
 from tasks.cache import TaskListCache
 from tasks.dto import (
     TaskActiveUserDTO,
@@ -293,3 +295,30 @@ class TaskService:
             for row in rows
         ]
         return TaskActiveUsersDTO(items=items)
+
+
+class TaskCleanupService:
+    """Синхронная очистка старых выполненных задач для Celery-воркера."""
+
+    @staticmethod
+    def delete_old_done(days: int) -> int:
+        if days < 1:
+            raise ValueError('days must be >= 1')
+
+        cutoff = utc_now() - timedelta(days=days)
+
+        with get_sync_session() as session:
+            try:
+                result = session.execute(
+                    delete(Task).where(
+                        Task.is_done.is_(True),
+                        Task.created_at < cutoff,
+                    )
+                )
+                count = result.rowcount
+                session.commit()
+            except SQLAlchemyError:
+                session.rollback()
+                raise
+
+        return count

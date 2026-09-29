@@ -1,14 +1,13 @@
 import logging.config
-import os
 
 from celery import Celery
 from celery.signals import worker_ready
 
 from common.sync_db import check_sync_connection
-from config import settings
+from config import BASE_DIR, settings
 
 logging.config.fileConfig(
-    os.path.join(os.path.dirname(__file__), 'logging.ini'),
+    BASE_DIR / 'logging.ini',
     disable_existing_loggers=False,
 )
 

@@ -198,7 +198,11 @@ def celery_eager(monkeypatch):
             session.close()
 
     monkeypatch.setattr(
-        'notifications.tasks.get_sync_session',
+        'notifications.services.get_sync_session',
+        _get_sync_session,
+    )
+    monkeypatch.setattr(
+        'tasks.services.get_sync_session',
         _get_sync_session,
     )
     yield
