@@ -76,6 +76,34 @@ services:
     healthcheck:
       disable: true
 
+  beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fastapi_beat
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      CELERY_TASK_ALWAYS_EAGER: "false"
+    depends_on:
+      redis:
+        condition: service_healthy
+    command:
+      [
+        "celery",
+        "-A",
+        "celery_app:celery_app",
+        "beat",
+        "--loglevel=info",
+        "--schedule=/var/lib/celery/celerybeat-schedule",
+      ]
+    volumes:
+      - celerybeat_data:/var/lib/celery
+    healthcheck:
+      disable: true
+
   migrations:
     build:
       context: .
@@ -94,3 +122,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  celerybeat_data:

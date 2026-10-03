@@ -27,7 +27,8 @@ COPY --from=builder /app/.venv /app/.venv
 COPY . .
 
 RUN useradd --create-home --shell /bin/bash app \
-    && chown -R app:app /app
+    && mkdir -p /var/lib/celery \
+    && chown -R app:app /app /var/lib/celery
 USER app
 
 EXPOSE 8000

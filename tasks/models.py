@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import uuid
+from datetime import date
 from typing import TYPE_CHECKING
 
 from sqlalchemy import (
+    Date,
     ForeignKey,
+    Integer,
     String,
     UniqueConstraint,
     Uuid,
@@ -38,3 +41,15 @@ class Task(TimestampMixin, Base):
     __table_args__ = (
         UniqueConstraint('user_id', 'title', name='unique_user_task_title'),
     )
+
+
+class DailyStat(Base):
+    __tablename__ = 'daily_stats'
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, primary_key=True, default=uuid.uuid4
+    )
+    date: Mapped[date] = mapped_column(Date, unique=True)
+    total: Mapped[int] = mapped_column(Integer)
+    done: Mapped[int] = mapped_column(Integer)
+    not_done: Mapped[int] = mapped_column(Integer)

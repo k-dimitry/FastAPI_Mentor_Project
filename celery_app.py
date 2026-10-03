@@ -1,6 +1,7 @@
 import logging.config
 
 from celery import Celery
+from celery.schedules import crontab
 from celery.signals import worker_ready
 
 from common.sync_db import check_sync_connection
@@ -30,6 +31,14 @@ celery_app.conf.update(
     task_eager_propagates=True,
     worker_hijack_root_logger=False,
 )
+
+celery_app.conf.beat_schedule = {
+    'cleanup-old-tasks-daily': {
+        'task': 'tasks.cleanup_old',
+        'schedule': crontab(hour=3, minute=0),
+        'args': (30,),
+    },
+}
 
 celery_app.autodiscover_tasks(['notifications'], force=True)
 

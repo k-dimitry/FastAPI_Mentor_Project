@@ -1,8 +1,10 @@
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy import and_, asc, case, delete, desc, func, or_, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,7 +23,7 @@ from tasks.dto import (
     TaskUpdateDTO,
 )
 from tasks.exceptions import TaskAlreadyExistsError
-from tasks.models import Task
+from tasks.models import DailyStat, Task
 from users.models import User
 
 
@@ -322,3 +324,57 @@ class TaskCleanupService:
                 raise
 
         return count
+
+
+class DailyStatsService:
+    """Синхронный снимок статистики всех задач для Celery-воркера."""
+
+    @staticmethod
+    def upsert_today() -> UUID:
+        return DailyStatsService.upsert_for_date(utc_now().date())
+
+    @staticmethod
+    def upsert_for_date(stat_date: date) -> UUID:
+        with get_sync_session() as session:
+            try:
+                row = session.execute(
+                    select(
+                        func.count().label('total'),
+                        func.sum(
+                            case((Task.is_done.is_(True), 1), else_=0)
+                        ).label('done'),
+                        func.sum(
+                            case((Task.is_done.is_(False), 1), else_=0)
+                        ).label('not_done'),
+                    )
+                ).one()
+                total = int(row.total or 0)
+                done = int(row.done or 0)
+                not_done = int(row.not_done or 0)
+
+                dialect = session.get_bind().dialect.name
+                insert_fn = (
+                    pg_insert if dialect == 'postgresql' else sqlite_insert
+                )
+                stmt = insert_fn(DailyStat).values(
+                    id=uuid4(),
+                    date=stat_date,
+                    total=total,
+                    done=done,
+                    not_done=not_done,
+                )
+                stmt = stmt.on_conflict_do_update(
+                    index_elements=['date'],
+                    set_={
+                        'total': stmt.excluded.total,
+                        'done': stmt.excluded.done,
+                        'not_done': stmt.excluded.not_done,
+                    },
+                ).returning(DailyStat.id)
+                stat_id = session.execute(stmt).scalar_one()
+                session.commit()
+            except SQLAlchemyError:
+                session.rollback()
+                raise
+
+        return stat_id
