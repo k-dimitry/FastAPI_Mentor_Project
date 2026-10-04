@@ -1,6 +1,6 @@
 # FastAPI Mentor Project
 
-Учебный REST API для управления задачами с JWT-аутентификацией, ролевой моделью, кэшем в Redis и rate limiting. Деплой через GitHub Actions + Docker Compose на VPS.
+Учебный REST API для задач: JWT, роли, кэш и rate limit в Redis, фоновые задачи в Celery. CI: линт и тесты, образ в GHCR, деплой на VPS.
 
 [![CI/CD](https://github.com/k-dimitry/FastAPI_Mentor_Project/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/k-dimitry/FastAPI_Mentor_Project/actions/workflows/ci-cd.yml)
 [![Coverage](./coverage.svg)](./coverage.svg)
@@ -9,61 +9,67 @@
 
 ## Стек
 
-- **Python 3.12** · **FastAPI** · **Pydantic v2** · **SQLAlchemy 2 (async)** · **Alembic**
-- **PostgreSQL 16** — основная БД (dev + prod)
-- **Redis 7** — кэш списка задач + счётчики rate limit
-- **Gunicorn + UvicornWorker** — 4 воркера
-- **Docker / Docker Compose** — упаковка и запуск
-- **pytest + httpx + fakeredis + time-machine** — тесты
-- **GitHub Actions** — CI/CD (тесты → GHCR → SSH-деплой)
-- **Nginx + Let's Encrypt** — reverse proxy и HTTPS
+Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2 (async), Alembic, PostgreSQL 16, Redis 7, Celery, Gunicorn + Uvicorn, Docker Compose, uv, pytest, GitHub Actions.
 
 ## Возможности
 
-- Регистрация, логин (JWT, OAuth2 Password Bearer), ролевая модель (`is_admin`)
-- CRUD задач с изоляцией данных по владельцу
-- Расширенный список задач: фильтр по статусу, диапазону дат, поиск по подстроке, сортировка, пагинация
-- Статистика: `total`, `by-day`, `active-users`, `dashboard`
-- Кэширование `GET /tasks/` в Redis и сброс кэша при изменении состояния задач
-- Rate limit: 60 запросов / 60 секунд на user_id (или IP для анонимных)
-- Логирование запросов с маскировкой чувствительных данных (пароли, токены)
+- Регистрация и логин (JWT), роль `is_admin`
+- CRUD задач с изоляцией по владельцу; список с фильтром, поиском, сортировкой и пагинацией
+- Статистика и дашборд: админ видит все задачи, остальные — свои
+- Кэш `GET /api/v1/tasks/` в Redis и rate limit 60 запросов / 60 секунд (значения в `.env`)
+- Celery: welcome-уведомление при регистрации, ночная очистка старых выполненных задач, ручной запуск очистки админом
 
-## Быстрый старт (Docker)
+Контракт API — в `/docs`.
+
+## Запуск
+
+Переменные — в [`.env.example`](.env.example). Redis: `/0` — кэш и rate limit, `/1` — брокер Celery, `/2` — результаты задач.
+
+### Docker
 
 ```bash
-git clone git@github.com:k-dimitry/FastAPI_Mentor_Project.git
-cd FastAPI_Mentor_Project
 cp .env.example .env
-# при необходимости отредактировать .env
+# при необходимости сменить JWT_SECRET_KEY
 
 docker compose up -d
-docker compose run --rm migrations
 ```
-API: http://localhost:8080/docs
 
-## Локальная разработка
+Миграции применяются сами. API: http://localhost:8080/docs
+
+Поднимаются API, Celery worker, beat, PostgreSQL и Redis.
+
+### Локально
+
+В `.env` для процессов на хосте замените `redis://redis` на `redis://localhost` (`REDIS_URL`, `CELERY_BROKER_URL`, `CELERY_RESULT_BACKEND`). `DATABASE_URL` в примере уже указывает на localhost.
 
 ```bash
-uv sync                                     # создать .venv + установить зависимости
-docker compose up -d db redis               # поднять только БД и Redis
-uv run alembic upgrade head                 # применить миграции
-uv run uvicorn main:app --reload            # запуск с автоперезагрузкой
+uv sync
+docker compose up -d db redis
+uv run alembic upgrade head
+uv run uvicorn main:app --reload
 ```
+
+API: http://localhost:8000/docs
+
+Worker и beat нужны только для фоновых задач: `uv run celery -A celery_app:celery_app worker` и `uv run celery -A celery_app:celery_app beat`.
+
 ## Тесты
 
 ```bash
-uv run pytest -q                            # все тесты
+uv run pytest -q
 uv run pytest --cov=./ --cov-report=term-missing
 ```
 
 ## Структура
+
 ```text
-api/v1/         — FastAPI-роутеры, схемы запросов/ответов
-  auth/         — логин, OAuth2-токен, зависимости (get_current_user, require_admin)
-  users/        — регистрация, профиль
-  tasks/        — CRUD, статистика, дашборд
-common/         — security, cache, redis_client, middleware, pagination, mixins
-tasks/          — DTO, модели, сервис, специфичный кэш
-users/          — DTO, модели, сервис, permissions
-alembic/        — миграции БД
+api/             — роутеры и схемы
+common/          — security, кэш, Redis, middleware
+tasks/           — модели, сервис и кэш задач
+users/           — модели, сервис, права
+notifications/   — welcome-уведомления и Celery-задачи
+alembic/         — миграции
+main.py          — приложение FastAPI
+celery_app.py    — worker и beat
+config.py        — настройки из .env
 ```
