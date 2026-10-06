@@ -5,7 +5,7 @@
 [![CI/CD](https://github.com/k-dimitry/FastAPI_Mentor_Project/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/k-dimitry/FastAPI_Mentor_Project/actions/workflows/ci-cd.yml)
 [![Coverage](./coverage.svg)](./coverage.svg)
 
-**Live API:** https://fastapi-project.hopto.org/docs
+**URL:** https://fastapi-project.hopto.org/docs
 
 ## Стек
 
