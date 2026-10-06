@@ -3,6 +3,7 @@ from contextlib import contextmanager
 from typing import Iterator
 
 from sqlalchemy import create_engine, text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
 from config import settings
@@ -29,12 +30,14 @@ def get_sync_session() -> Iterator[Session]:
     session = SyncSessionLocal()
     try:
         yield session
+    except SQLAlchemyError:
+        session.rollback()
+        raise
     finally:
         session.close()
 
 
 def check_sync_connection() -> None:
-    """Проверяет connectivity sync-engine (SELECT 1)."""
     with sync_engine.connect() as conn:
         conn.execute(text('SELECT 1'))
     logger.info(

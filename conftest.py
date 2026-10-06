@@ -22,6 +22,7 @@ from main import app
 from tasks.models import Task
 from users.models import User
 
+# использовать postgres в тестах на сервисы
 TEST_DATABASE_URL = (
     'sqlite+aiosqlite:///file:memdb1?mode=memory&cache=shared&uri=true'
 )

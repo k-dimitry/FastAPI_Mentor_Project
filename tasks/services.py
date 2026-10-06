@@ -5,7 +5,7 @@ from uuid import UUID, uuid4
 from sqlalchemy import and_, asc, case, delete, desc, func, or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from common.mixins import utc_now
@@ -53,7 +53,7 @@ class TaskService:
         return result.scalar_one_or_none()
 
     async def create_task(
-        self, dto: TaskCreateDTO, user_id: UUID
+            self, dto: TaskCreateDTO, user_id: UUID
     ) -> TaskResponseDTO:
         """Create Task and return DTO. Инвалидирует кэш списка."""
         owner = user_id
@@ -76,7 +76,7 @@ class TaskService:
         return self._to_dto(new_task)
 
     async def get_task(
-        self, task_id: UUID, user_id: UUID
+            self, task_id: UUID, user_id: UUID
     ) -> TaskResponseDTO | None:
         """Возвращает задачу, только если она принадлежит пользователю."""
         task = await self._get_user_task(task_id, user_id)
@@ -163,7 +163,7 @@ class TaskService:
         return result_dto
 
     async def update_task(
-        self, task_id: UUID, dto: TaskUpdateDTO, user_id: UUID
+            self, task_id: UUID, dto: TaskUpdateDTO, user_id: UUID
     ) -> TaskResponseDTO | None:
         """Обновляет задачу, если принадлежит пользователю, иначе None.
         Инвалидирует кэш списка."""
@@ -310,18 +310,14 @@ class TaskCleanupService:
         cutoff = utc_now() - timedelta(days=days)
 
         with get_sync_session() as session:
-            try:
-                result = session.execute(
-                    delete(Task).where(
-                        Task.is_done.is_(True),
-                        Task.created_at < cutoff,
-                    )
+            result = session.execute(
+                delete(Task).where(
+                    Task.is_done.is_(True),
+                    Task.created_at < cutoff,
                 )
-                count = result.rowcount
-                session.commit()
-            except SQLAlchemyError:
-                session.rollback()
-                raise
+            )
+            count = result.rowcount
+            session.commit()
 
         return count
 
@@ -336,45 +332,41 @@ class DailyStatsService:
     @staticmethod
     def upsert_for_date(stat_date: date) -> UUID:
         with get_sync_session() as session:
-            try:
-                row = session.execute(
-                    select(
-                        func.count().label('total'),
-                        func.sum(
-                            case((Task.is_done.is_(True), 1), else_=0)
-                        ).label('done'),
-                        func.sum(
-                            case((Task.is_done.is_(False), 1), else_=0)
-                        ).label('not_done'),
-                    )
-                ).one()
-                total = int(row.total or 0)
-                done = int(row.done or 0)
-                not_done = int(row.not_done or 0)
+            row = session.execute(
+                select(
+                    func.count().label('total'),
+                    func.sum(
+                        case((Task.is_done.is_(True), 1), else_=0)
+                    ).label('done'),
+                    func.sum(
+                        case((Task.is_done.is_(False), 1), else_=0)
+                    ).label('not_done'),
+                )
+            ).one()
+            total = int(row.total or 0)
+            done = int(row.done or 0)
+            not_done = int(row.not_done or 0)
 
-                dialect = session.get_bind().dialect.name
-                insert_fn = (
-                    pg_insert if dialect == 'postgresql' else sqlite_insert
-                )
-                stmt = insert_fn(DailyStat).values(
-                    id=uuid4(),
-                    date=stat_date,
-                    total=total,
-                    done=done,
-                    not_done=not_done,
-                )
-                stmt = stmt.on_conflict_do_update(
-                    index_elements=['date'],
-                    set_={
-                        'total': stmt.excluded.total,
-                        'done': stmt.excluded.done,
-                        'not_done': stmt.excluded.not_done,
-                    },
-                ).returning(DailyStat.id)
-                stat_id = session.execute(stmt).scalar_one()
-                session.commit()
-            except SQLAlchemyError:
-                session.rollback()
-                raise
+            dialect = session.get_bind().dialect.name
+            insert_fn = (
+                pg_insert if dialect == 'postgresql' else sqlite_insert
+            )
+            stmt = insert_fn(DailyStat).values(
+                id=uuid4(),
+                date=stat_date,
+                total=total,
+                done=done,
+                not_done=not_done,
+            )
+            stmt = stmt.on_conflict_do_update(
+                index_elements=['date'],
+                set_={
+                    'total': stmt.excluded.total,
+                    'done': stmt.excluded.done,
+                    'not_done': stmt.excluded.not_done,
+                },
+            ).returning(DailyStat.id)
+            stat_id = session.execute(stmt).scalar_one()
+            session.commit()
 
         return stat_id
