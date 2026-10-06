@@ -31,6 +31,7 @@ jobs:
           --health-retries 10
     env:
       DATABASE_URL: postgresql+asyncpg://test:test@localhost:5432/test
+      SYNC_DATABASE_URL: postgresql+psycopg2://test:test@localhost:5432/test
       TEST_DATABASE_URL: postgresql+asyncpg://test:test@localhost:5432/test_test
       SYNC_TEST_DATABASE_URL: postgresql+psycopg2://test:test@localhost:5432/test_test
       JWT_SECRET_KEY: test-secret-key-for-ci-only-min-32-chars

@@ -9,7 +9,7 @@ BASE_DIR = Path(__file__).resolve().parent
 class Settings(BaseSettings):
     DATABASE_URL: PostgresDsn
     DATABASE_ECHO: bool = False
-    SYNC_DATABASE_URL: str = 'sqlite:///./test.db'
+    SYNC_DATABASE_URL: str
 
     JWT_SECRET_KEY: SecretStr
     JWT_ALGORITHM: str = 'HS256'

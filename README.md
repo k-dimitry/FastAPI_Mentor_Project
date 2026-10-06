@@ -55,6 +55,8 @@ Worker и beat нужны только для фоновых задач: `uv run
 
 ## Тесты
 
+Нужен поднятый Postgres: `docker compose up -d db`. Тесты пишут в отдельную базу `{db}_test` (`mydb` → `mydb_test`) и рабочую базу не очищают.
+
 ```bash
 uv run pytest -q
 uv run pytest --cov=./ --cov-report=term-missing
