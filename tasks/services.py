@@ -3,8 +3,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from uuid import UUID, uuid4
 
 from sqlalchemy import and_, asc, case, delete, desc, func, or_, select
-from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -347,11 +346,7 @@ class DailyStatsService:
             done = int(row.done or 0)
             not_done = int(row.not_done or 0)
 
-            dialect = session.get_bind().dialect.name
-            insert_fn = (
-                pg_insert if dialect == 'postgresql' else sqlite_insert
-            )
-            stmt = insert_fn(DailyStat).values(
+            stmt = insert(DailyStat).values(
                 id=uuid4(),
                 date=stat_date,
                 total=total,
