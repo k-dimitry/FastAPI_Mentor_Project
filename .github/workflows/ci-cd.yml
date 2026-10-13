@@ -124,9 +124,9 @@ jobs:
             cd /opt/fastapi_project
             
             docker logout ghcr.io || true
-            docker compose -f docker-compose.prod.yml pull app migrations
+            docker compose -f docker-compose.prod.yml pull app migrations celery beat
             docker compose -f docker-compose.prod.yml run --rm migrations
-            docker compose -f docker-compose.prod.yml up -d app
+            docker compose -f docker-compose.prod.yml up -d app celery beat
             docker image prune -f
 
       - name: Send Telegram notification
