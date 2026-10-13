@@ -1,14 +1,18 @@
 import hashlib
 import json
+import logging
 from dataclasses import asdict
 from datetime import datetime
 from typing import Any
 from uuid import UUID
 
+from common import redis_client
 from common.cache import Cache
 from common.cache import cache as default_cache
 from config import settings
 from tasks.dto import TaskListDTO, TaskResponseDTO
+
+logger = logging.getLogger('app')
 
 
 class TaskListCache:
@@ -97,3 +101,19 @@ class TaskListCache:
     async def invalidate_user_lists(self, user_id: UUID) -> None:
         pattern = f'{self.PREFIX}:{user_id}:*'
         await self._cache.delete_pattern(pattern)
+
+    @classmethod
+    def invalidate_all_sync(cls) -> None:
+        """Удаляет кэш списков всех пользователей. Ошибка Redis не бросается."""
+        pattern = f'{cls.PREFIX}:*'
+        try:
+            client = redis_client.get_sync_redis()
+            try:
+                for key in client.scan_iter(match=pattern):
+                    client.delete(key)
+            finally:
+                client.close()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                'Cache invalidate failed for %s: %s', pattern, exc
+            )

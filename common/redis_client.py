@@ -1,5 +1,7 @@
 import logging
 
+from redis import Redis as SyncRedis
+from redis import from_url as sync_from_url
 from redis.asyncio import Redis, from_url
 
 from config import settings
@@ -40,3 +42,8 @@ async def close_redis() -> None:
 def get_redis() -> Redis | None:
     """Возвращает текущий клиент. None, если Redis недоступен."""
     return _redis
+
+
+def get_sync_redis() -> SyncRedis:
+    """Короткоживущий sync-клиент для Celery. База та же, что у кэша."""
+    return sync_from_url(settings.REDIS_URL, decode_responses=True)

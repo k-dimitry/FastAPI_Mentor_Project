@@ -327,6 +327,7 @@ class TaskCleanupService:
             count = result.rowcount
             session.commit()
 
+        TaskListCache.invalidate_all_sync()
         return count
 
 
