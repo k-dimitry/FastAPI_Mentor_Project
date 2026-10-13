@@ -13,11 +13,12 @@ Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2 (async), Alembic, PostgreSQL 16,
 
 ## Возможности
 
-- Регистрация и логин (JWT), роль `is_admin`
+- Регистрация и логин (JWT), роль `is_admin` читается из базы на каждом запросе
 - CRUD задач с изоляцией по владельцу; список с фильтром, поиском, сортировкой и пагинацией
-- Статистика и дашборд: админ видит все задачи, остальные — свои
+- `GET /api/v1/tasks/stats/total` и `/by-day` всегда по текущему пользователю, в том числе для админа
+- `GET /api/v1/tasks/dashboard`: админ видит все задачи, остальные — свои
 - Кэш `GET /api/v1/tasks/` в Redis и rate limit 60 запросов / 60 секунд (значения в `.env`)
-- Celery: welcome-уведомление при регистрации, ночная очистка старых выполненных задач, ручной запуск очистки админом
+- Celery: welcome-уведомление при регистрации, ночная очистка старых выполненных задач, снимок в `daily_stats`, ручной запуск очистки админом (`POST /api/v1/admin/cleanup`)
 
 Контракт API — в `/docs`.
 
@@ -52,6 +53,17 @@ uv run uvicorn main:app --reload
 API: http://localhost:8000/docs
 
 Worker и beat нужны только для фоновых задач: `uv run celery -A celery_app:celery_app worker` и `uv run celery -A celery_app:celery_app beat`.
+
+## Первый админ
+
+Регистрация всегда создаёт пользователя с `is_admin = false`. Роль выдаётся обновлением строки в Postgres (`POSTGRES_USER` и `POSTGRES_DB` из `.env`; в примере это `user` и `mydb`):
+
+```bash
+docker compose exec db psql -U user -d mydb \
+  -c "UPDATE users SET is_admin = true WHERE username = 'имя';"
+```
+
+Роль читается из базы на каждом запросе, поэтому следующий запрос уже идёт с правами админа.
 
 ## Тесты
 
