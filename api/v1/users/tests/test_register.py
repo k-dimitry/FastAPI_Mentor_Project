@@ -394,3 +394,70 @@ class TestUserRegisterValidation:
         body = response.json()
 
         assert body == {'detail': [expected_error]}
+
+    async def test_register_email_too_long(self, client: AsyncClient):
+        email = 'a' * 64 + '@' + 'b' * 50 + '.example.com'
+
+        payload = {
+            'username': 'user',
+            'email': email,
+            'first_name': 'User',
+            'last_name': 'User',
+            'password': CORRECT_PASSWORD,
+            'birthdate': '1995-01-01',
+        }
+
+        response = await client.post(self.url, json=payload)
+
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+        assert response.json() == {
+            'detail': [
+                {
+                    'type': 'too_long',
+                    'loc': ['body', 'email'],
+                    'msg': (
+                        'Value should have at most 120 items '
+                        'after validation, not 127'
+                    ),
+                    'input': email,
+                    'ctx': {
+                        'field_type': 'Value',
+                        'max_length': 120,
+                        'actual_length': 127,
+                    },
+                }
+            ]
+        }
+
+    async def test_register_email_at_max_length(
+        self, client: AsyncClient, mock_user_service
+    ):
+        email = 'a' * 52 + '@' + 'b' * 63 + '.com'
+        fixed_id = uuid.UUID('11111111-1111-1111-1111-111111111111')
+        fixed_dt = datetime(2026, 8, 30, 12, 30, tzinfo=timezone.utc)
+        mock_user_service.create_user.return_value = UserResponseDTO(
+            id=fixed_id,
+            username='user',
+            email=email,
+            first_name='User',
+            last_name='User',
+            birthdate=date(1995, 1, 1),
+            created_at=fixed_dt,
+            updated_at=fixed_dt,
+            is_admin=False,
+        )
+
+        payload = {
+            'username': 'user',
+            'email': email,
+            'first_name': 'User',
+            'last_name': 'User',
+            'password': CORRECT_PASSWORD,
+            'birthdate': '1995-01-01',
+        }
+
+        response = await client.post(self.url, json=payload)
+
+        assert len(email) == 120
+        assert response.status_code == status.HTTP_201_CREATED
+        assert response.json()['email'] == email

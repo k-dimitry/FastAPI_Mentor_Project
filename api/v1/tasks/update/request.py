@@ -10,6 +10,7 @@ class TaskUpdateRequest(BaseModel):
         str,
         Field(
             None,
+            min_length=1,
             max_length=50,
             description='Новый заголовок задачи',
             json_schema_extra={'example': 'Обновлённое название'},

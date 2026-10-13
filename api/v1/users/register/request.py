@@ -9,7 +9,7 @@ from users.dto import UserCreateDTO
 
 class UserRegisterRequest(BaseModel):
     username: Annotated[str, Field(..., min_length=3, max_length=50)]
-    email: EmailStr
+    email: Annotated[EmailStr, Field(..., max_length=120)]
     first_name: Annotated[str, Field(..., min_length=1, max_length=50)]
     last_name: Annotated[str, Field(..., min_length=1, max_length=50)]
     password: Annotated[SecretStr, Field(..., min_length=8, max_length=128)]

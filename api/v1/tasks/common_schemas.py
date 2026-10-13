@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 
 
 class TaskBase(BaseModel):
-    title: Annotated[str, Field(..., max_length=50)]
+    title: Annotated[str, Field(..., min_length=1, max_length=50)]
     description: Annotated[str | None, Field(None, max_length=10_000)]
     is_done: bool = False
 

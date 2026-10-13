@@ -177,6 +177,28 @@ class TestTasksCreate:
             expected_dto, user_id=test_user.id
         )
 
+    async def test_create_task_empty_title(
+        self, client: AsyncClient, user_token
+    ):
+        response = await client.post(
+            '/api/v1/tasks/',
+            headers={'Authorization': f'Bearer {user_token}'},
+            json={'title': ''},
+        )
+
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+        assert response.json() == {
+            'detail': [
+                {
+                    'type': 'string_too_short',
+                    'loc': ['body', 'title'],
+                    'msg': 'String should have at least 1 character',
+                    'input': '',
+                    'ctx': {'min_length': 1},
+                }
+            ]
+        }
+
     @time_machine.travel(
         datetime(2026, 8, 30, 12, 30, tzinfo=timezone.utc),
         tick=False,
@@ -335,6 +357,35 @@ class TestTasksPatch:
         db_session.expire_all()
         task_in_db = await db_session.get(Task, other_id)
         assert task_in_db.title == 'Taken'
+
+    async def test_patch_task_empty_title(
+        self, client: AsyncClient, user_token, created_task, db_session
+    ):
+        task_id = created_task.id
+        original_title = created_task.title
+
+        response = await client.patch(
+            f'/api/v1/tasks/{task_id}',
+            headers={'Authorization': f'Bearer {user_token}'},
+            json={'title': ''},
+        )
+
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+        assert response.json() == {
+            'detail': [
+                {
+                    'type': 'string_too_short',
+                    'loc': ['body', 'title'],
+                    'msg': 'String should have at least 1 character',
+                    'input': '',
+                    'ctx': {'min_length': 1},
+                }
+            ]
+        }
+
+        db_session.expire_all()
+        task_in_db = await db_session.get(Task, task_id)
+        assert task_in_db.title == original_title
 
     async def test_patch_task_description_to_none(
         self, client, user_token, mock_task_service, test_user, created_task
