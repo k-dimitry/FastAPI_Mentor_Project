@@ -1,5 +1,7 @@
+from celery.schedules import crontab
 from sqlalchemy import func, select
 
+from celery_app import celery_app
 from notifications.tasks import generate_daily_stats
 from tasks.dto import TaskCreateDTO, TaskUpdateDTO
 from tasks.models import DailyStat
@@ -45,3 +47,13 @@ class TestGenerateDailyStats:
         assert rows[0].total == 2
         assert rows[0].done == 0
         assert rows[0].not_done == 2
+
+
+class TestDailyStatsSchedule:
+    async def test_beat_runs_after_cleanup(self):
+        entry = celery_app.conf.beat_schedule['generate-daily-stats']
+
+        assert entry['task'] == 'tasks.generate_daily_stats'
+        assert entry['schedule'] == crontab(hour=3, minute=5)
+        assert entry.get('args') in (None, ())
+        assert entry.get('kwargs') in (None, {})

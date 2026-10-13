@@ -38,6 +38,11 @@ celery_app.conf.beat_schedule = {
         'schedule': crontab(hour=3, minute=0),
         'args': (30,),
     },
+    # Снимок после очистки, без только что удалённых задач.
+    'generate-daily-stats': {
+        'task': 'tasks.generate_daily_stats',
+        'schedule': crontab(hour=3, minute=5),
+    },
 }
 
 celery_app.autodiscover_tasks(['notifications'], force=True)
