@@ -101,14 +101,14 @@ def _ensure_database_exists(url: URL) -> None:
         poolclass=NullPool,
     )
     try:
-        quoted = admin_engine.dialect.identifier_preparer.quote(name)
+        test_db_name = admin_engine.dialect.identifier_preparer.quote(name)
         with admin_engine.connect() as conn:
             exists = conn.execute(
                 text('SELECT 1 FROM pg_database WHERE datname = :name'),
                 {'name': name},
             ).scalar()
             if not exists:
-                conn.execute(text(f'CREATE DATABASE {quoted}'))
+                conn.execute(text(f'CREATE DATABASE {test_db_name}'))
     finally:
         admin_engine.dispose()
 
