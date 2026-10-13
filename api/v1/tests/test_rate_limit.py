@@ -1,6 +1,11 @@
-import pytest
-from fastapi import status
+import os
 
+import pytest
+from fastapi import Request, status
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
+
+import gunicorn_conf
+from common.middleware import _get_rate_limit_identifier
 from config import settings
 
 
@@ -90,3 +95,54 @@ class TestRateLimit:
                 headers={'Authorization': f'Bearer {user_token}'},
             )
             assert response.status_code == status.HTTP_200_OK
+
+
+def _trusted_peer() -> str:
+    first = gunicorn_conf.forwarded_allow_ips.split(',')[0].strip()
+    if first == '*' or '/' in first:
+        pytest.skip('FORWARDED_ALLOW_IPS is not a single host')
+    return first
+
+
+async def _rate_limit_id(peer: str, forwarded_for: str) -> str:
+    seen = {}
+
+    async def app(scope, receive, send):
+        request = Request(scope)
+        seen['identifier'] = _get_rate_limit_identifier(request)
+
+    middleware = ProxyHeadersMiddleware(
+        app,
+        trusted_hosts=gunicorn_conf.forwarded_allow_ips,
+    )
+    scope = {
+        'type': 'http',
+        'client': (peer, 12345),
+        'headers': [(b'x-forwarded-for', forwarded_for.encode())],
+    }
+    await middleware(scope, None, None)
+    return seen['identifier']
+
+
+class TestForwardedClientIp:
+    def test_forwarded_allow_ips_defaults_to_loopback(self):
+        assert gunicorn_conf.forwarded_allow_ips == os.getenv(
+            'FORWARDED_ALLOW_IPS', '127.0.0.1'
+        )
+        assert gunicorn_conf.forwarded_allow_ips != '*'
+
+    async def test_untrusted_peer_ignores_spoofed_forwarded_for(self):
+        peer = '203.0.113.8'
+        if peer == _trusted_peer():
+            peer = '203.0.113.9'
+
+        first = await _rate_limit_id(peer, '198.51.100.1')
+        second = await _rate_limit_id(peer, '198.51.100.2')
+
+        assert first == f'ip:{peer}'
+        assert second == first
+
+    async def test_trusted_proxy_uses_forwarded_for(self):
+        identifier = await _rate_limit_id(_trusted_peer(), '198.51.100.9')
+
+        assert identifier == 'ip:198.51.100.9'
