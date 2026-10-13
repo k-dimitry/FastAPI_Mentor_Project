@@ -177,7 +177,14 @@ class TaskService:
         if dto.is_done_is_set:
             task.is_done = dto.is_done
 
-        await self.db.commit()
+        title = task.title
+        try:
+            await self.db.commit()
+        except IntegrityError:
+            await self.db.rollback()
+            raise TaskAlreadyExistsError(
+                f"Task '{title}' already exists for this user."
+            )
         await self.db.refresh(task)
         await self._tasks_cache.invalidate_user_lists(user_id)
         return self._to_dto(task)

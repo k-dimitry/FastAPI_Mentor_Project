@@ -283,6 +283,38 @@ class TestTasksPatch:
         assert task_in_db.description == created_task.description
         assert task_in_db.is_done == created_task.is_done
 
+    async def test_patch_task_duplicate_title(
+        self,
+        client: AsyncClient,
+        user_token,
+        created_task,
+        create_task_in_db,
+        test_user,
+        db_session,
+    ):
+        other = await create_task_in_db(
+            user_id=test_user.id,
+            title='Taken',
+        )
+        other_id = other.id
+
+        response = await client.patch(
+            f'/api/v1/tasks/{other_id}',
+            headers={'Authorization': f'Bearer {user_token}'},
+            json={'title': created_task.title},
+        )
+
+        assert response.status_code == status.HTTP_409_CONFLICT
+        assert response.json() == {
+            'detail': (
+                f"Task '{created_task.title}' already exists for this user."
+            )
+        }
+
+        db_session.expire_all()
+        task_in_db = await db_session.get(Task, other_id)
+        assert task_in_db.title == 'Taken'
+
     async def test_patch_task_description_to_none(
         self, client, user_token, mock_task_service, test_user, created_task
     ):

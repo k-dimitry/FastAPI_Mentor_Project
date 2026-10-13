@@ -76,6 +76,25 @@ class TestTaskServiceDuplicate:
 
         assert result.title == title
 
+    async def test_update_duplicate_title_same_user(
+        self, service, user, created_task
+    ):
+        second = await service.create_task(
+            TaskCreateDTO(title='Second'), user_id=user.id
+        )
+        dto = TaskUpdateDTO(title=created_task.title)
+
+        with pytest.raises(TaskAlreadyExistsError) as exc_info:
+            await service.update_task(second.id, dto, user_id=user.id)
+
+        assert exc_info.value.message == (
+            f"Task '{created_task.title}' already exists for this user."
+        )
+
+        service.db.expire_all()
+        task_in_db = await service.db.get(Task, second.id)
+        assert task_in_db.title == 'Second'
+
 
 class TestTaskServiceRead:
     async def test_get_all_tasks_pagination(self, service, user, five_tasks):
