@@ -34,7 +34,9 @@ class TestUserService:
         assert user_in_db is not None
         assert user_in_db.birthdate == date(1985, 3, 20)
         assert user_in_db.hashed_password != 'Str0ngPass!'
-        assert len(user_in_db.hashed_password) > 20
+        assert await service.verify_password(
+            'Str0ngPass!', user_in_db.hashed_password
+        )
 
     async def test_create_user_without_birthdate(self, service):
         dto = UserCreateDTO(

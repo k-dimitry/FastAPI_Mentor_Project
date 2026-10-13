@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from common.security import hash_password
 from notifications.tasks import send_welcome_notification
 from users.dto import UserCreateDTO, UserResponseDTO
 from users.exceptions import UserAlreadyExistsError
@@ -32,7 +33,7 @@ class UserService:
 
     async def create_user(self, dto: UserCreateDTO) -> UserResponseDTO:
         """Регистрирует нового пользователя с хешированием пароля."""
-        hashed = bcrypt.hashpw(dto.password.encode(), bcrypt.gensalt()).decode()
+        hashed = await asyncio.to_thread(hash_password, dto.password)
 
         user = User(
             username=dto.username,

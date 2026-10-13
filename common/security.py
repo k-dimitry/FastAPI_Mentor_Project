@@ -28,4 +28,5 @@ def decode_access_token(token: str) -> dict | None:
 
 
 def hash_password(password: str) -> str:
+    """Хеширует пароль bcrypt."""
     return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
