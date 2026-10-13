@@ -86,6 +86,27 @@ class TestTasksList:
             '?limit=2&offset=0&order_by=title&direction=asc'
         )
 
+    async def test_get_tasks_offset_past_end(
+        self, client: AsyncClient, user_token, create_task_in_db, test_user
+    ):
+        for i in range(5):
+            await create_task_in_db(user_id=test_user.id, title=f'Task {i}')
+
+        response = await client.get(
+            '/api/v1/tasks/?limit=2&offset=10&order_by=title&direction=asc',
+            headers={'Authorization': f'Bearer {user_token}'},
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data['count'] == 5
+        assert data['result'] == []
+        assert data['next'] is None
+        assert data['previous'] == (
+            'http://test/api/v1/tasks/'
+            '?limit=2&offset=8&order_by=title&direction=asc'
+        )
+
     async def test_get_tasks_filter_is_done(
         self, client: AsyncClient, user_token, create_task_in_db, test_user
     ):

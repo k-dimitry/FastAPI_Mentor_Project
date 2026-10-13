@@ -132,10 +132,12 @@ class TaskService:
             )
 
         where_clause = and_(*conditions)
-        stmt = select(Task, func.count().over().label('total')).where(
-            where_clause
+        count_stmt = (
+            select(func.count()).select_from(Task).where(where_clause)
         )
+        total = await self.db.scalar(count_stmt) or 0
 
+        stmt = select(Task).where(where_clause)
         order_column = getattr(Task, order_by, Task.created_at)
         if direction == 'asc':
             stmt = stmt.order_by(asc(order_column))
@@ -145,18 +147,10 @@ class TaskService:
         stmt = stmt.offset(offset).limit(limit)
 
         result = await self.db.execute(stmt)
-        rows = result.all()
-
-        if not rows:
-            result_dto = TaskListDTO(
-                items=[], total=0, limit=limit, offset=offset
-            )
-        else:
-            total = rows[0].total
-            items = [self._to_dto(row.Task) for row in rows]
-            result_dto = TaskListDTO(
-                items=items, total=total, limit=limit, offset=offset
-            )
+        items = [self._to_dto(task) for task in result.scalars().all()]
+        result_dto = TaskListDTO(
+            items=items, total=total, limit=limit, offset=offset
+        )
 
         await self._tasks_cache.set(user_id, filters, result_dto)
         return result_dto

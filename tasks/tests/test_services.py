@@ -121,6 +121,20 @@ class TestTaskServiceRead:
         assert first.created_at is not None
         assert first.updated_at is not None
 
+    async def test_get_all_tasks_offset_past_end(
+        self, service, user, five_tasks
+    ):
+        result = await service.get_all_tasks(
+            user_id=user.id,
+            limit=2,
+            offset=10,
+        )
+
+        assert result.total == 5
+        assert result.items == []
+        assert result.limit == 2
+        assert result.offset == 10
+
     async def test_get_task_by_id(self, service, created_task, user):
         found = await service.get_task(created_task.id, user.id)
 
