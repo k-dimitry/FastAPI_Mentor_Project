@@ -97,3 +97,39 @@ class TestTasksFilteringAndOrdering:
                 == f'Task {expected_titles[index].split()[-1]} description'
             )
             assert task['is_done'] is True
+
+
+class TestTasksSearch:
+    async def test_search_percent_is_literal(
+        self, client: AsyncClient, user_token, create_task_in_db, test_user
+    ):
+        await create_task_in_db(user_id=test_user.id, title='100% done')
+        await create_task_in_db(user_id=test_user.id, title='Other')
+
+        response = await client.get(
+            '/api/v1/tasks/',
+            headers={'Authorization': f'Bearer {user_token}'},
+            params={'query': '%'},
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data['count'] == 1
+        assert data['result'][0]['title'] == '100% done'
+
+    async def test_search_underscore_is_literal(
+        self, client: AsyncClient, user_token, create_task_in_db, test_user
+    ):
+        await create_task_in_db(user_id=test_user.id, title='a_b')
+        await create_task_in_db(user_id=test_user.id, title='axb')
+
+        response = await client.get(
+            '/api/v1/tasks/',
+            headers={'Authorization': f'Bearer {user_token}'},
+            params={'query': 'a_b'},
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data['count'] == 1
+        assert data['result'][0]['title'] == 'a_b'

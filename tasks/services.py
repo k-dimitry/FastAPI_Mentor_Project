@@ -43,6 +43,14 @@ class TaskService:
             is_done=task.is_done,
         )
 
+    @staticmethod
+    def _ilike_contains(value: str) -> str:
+        """Экранирует обратный слэш, % и _ для поиска подстроки через ILIKE."""
+        escaped = value.replace('\\', '\\\\')
+        escaped = escaped.replace('%', '\\%')
+        escaped = escaped.replace('_', '\\_')
+        return f'%{escaped}%'
+
     async def _get_user_task(self, task_id: UUID, user_id: UUID) -> Task | None:
         """Возвращает задачу, принадлежащую указанному пользователю,
         или None."""
@@ -123,11 +131,11 @@ class TaskService:
         if created_to is not None:
             conditions.append(Task.created_at <= created_to)
         if query:
-            search = f'%{query}%'
+            search = self._ilike_contains(query)
             conditions.append(
                 or_(
-                    Task.title.ilike(search),
-                    Task.description.ilike(search),
+                    Task.title.ilike(search, escape='\\'),
+                    Task.description.ilike(search, escape='\\'),
                 )
             )
 

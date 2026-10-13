@@ -324,3 +324,60 @@ class TestTaskServiceFilter:
         assert result.total == 1
         assert result.items[0].title == 'Not Done'
         assert result.items[0].is_done is False
+
+
+class TestTaskServiceSearch:
+    async def test_search_substring(self, service, user):
+        await service.create_task(TaskCreateDTO(title='Alpha'), user_id=user.id)
+        await service.create_task(TaskCreateDTO(title='Beta'), user_id=user.id)
+
+        result = await service.get_all_tasks(user_id=user.id, query='lph')
+
+        assert result.total == 1
+        assert result.items[0].title == 'Alpha'
+
+    async def test_search_percent_is_literal(self, service, user):
+        await service.create_task(
+            TaskCreateDTO(title='100% done'), user_id=user.id
+        )
+        await service.create_task(
+            TaskCreateDTO(title='Other'), user_id=user.id
+        )
+
+        result = await service.get_all_tasks(user_id=user.id, query='%')
+
+        assert result.total == 1
+        assert result.items[0].title == '100% done'
+
+    async def test_search_underscore_is_literal(self, service, user):
+        await service.create_task(TaskCreateDTO(title='a_b'), user_id=user.id)
+        await service.create_task(TaskCreateDTO(title='axb'), user_id=user.id)
+
+        result = await service.get_all_tasks(user_id=user.id, query='a_b')
+
+        assert result.total == 1
+        assert result.items[0].title == 'a_b'
+
+    async def test_search_backslash_is_literal(self, service, user):
+        await service.create_task(TaskCreateDTO(title='a\\b'), user_id=user.id)
+        await service.create_task(TaskCreateDTO(title='ab'), user_id=user.id)
+
+        result = await service.get_all_tasks(user_id=user.id, query='a\\b')
+
+        assert result.total == 1
+        assert result.items[0].title == 'a\\b'
+
+    async def test_search_description(self, service, user):
+        await service.create_task(
+            TaskCreateDTO(title='Task', description='100% ready'),
+            user_id=user.id,
+        )
+        await service.create_task(
+            TaskCreateDTO(title='Other', description='plain'),
+            user_id=user.id,
+        )
+
+        result = await service.get_all_tasks(user_id=user.id, query='100%')
+
+        assert result.total == 1
+        assert result.items[0].title == 'Task'
