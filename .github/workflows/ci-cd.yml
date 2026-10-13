@@ -61,6 +61,7 @@ jobs:
         run: uv run genbadge coverage -i coverage.xml -o coverage.svg
 
       - name: Commit tests coverage badge
+        if: github.ref == 'refs/heads/master' && github.event_name == 'push'
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
           file_pattern: 'coverage.svg'
