@@ -96,6 +96,58 @@ class TestRateLimit:
             )
             assert response.status_code == status.HTTP_200_OK
 
+    async def test_window_has_ttl(self, client, fake_redis, user_token):
+        response = await client.get(
+            '/api/v1/tasks/',
+            headers={'Authorization': f'Bearer {user_token}'},
+        )
+        assert response.status_code == status.HTTP_200_OK
+
+        keys = await fake_redis.keys('rl:*')
+        assert len(keys) == 1
+        ttl = await fake_redis.ttl(keys[0])
+        assert 0 < ttl <= settings.RATE_LIMIT_T
+
+    async def test_key_without_ttl_gets_expire(
+        self, client, fake_redis, user_token
+    ):
+        await client.get(
+            '/api/v1/tasks/',
+            headers={'Authorization': f'Bearer {user_token}'},
+        )
+        key = (await fake_redis.keys('rl:*'))[0]
+        await fake_redis.persist(key)
+        assert await fake_redis.ttl(key) == -1
+
+        response = await client.get(
+            '/api/v1/tasks/',
+            headers={'Authorization': f'Bearer {user_token}'},
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        assert int(await fake_redis.get(key)) == 2
+        ttl = await fake_redis.ttl(key)
+        assert 0 < ttl <= settings.RATE_LIMIT_T
+
+    async def test_existing_ttl_is_not_reset(
+        self, client, fake_redis, user_token
+    ):
+        await client.get(
+            '/api/v1/tasks/',
+            headers={'Authorization': f'Bearer {user_token}'},
+        )
+        key = (await fake_redis.keys('rl:*'))[0]
+        await fake_redis.expire(key, 10)
+
+        await client.get(
+            '/api/v1/tasks/',
+            headers={'Authorization': f'Bearer {user_token}'},
+        )
+
+        ttl = await fake_redis.ttl(key)
+        assert 0 < ttl <= 10
+        assert int(await fake_redis.get(key)) == 2
+
 
 def _trusted_peer() -> str:
     first = gunicorn_conf.forwarded_allow_ips.split(',')[0].strip()

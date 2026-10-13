@@ -12,6 +12,16 @@ from config import settings
 
 logger = logging.getLogger('app')
 
+# INCR и EXPIRE в одном скрипте: обрыв между двумя командами оставлял
+# ключ без TTL. Если TTL уже нет, окно выставляется заново.
+_RATE_LIMIT_INCR = """
+local current = redis.call('INCR', KEYS[1])
+if redis.call('TTL', KEYS[1]) < 0 then
+    redis.call('EXPIRE', KEYS[1], ARGV[1])
+end
+return {current, redis.call('TTL', KEYS[1])}
+"""
+
 SENSITIVE_FIELDS: set[str] = {
     'password',
     'token',
@@ -92,12 +102,14 @@ async def rate_limit(request: Request, call_next):
     key = f'rl:{identifier}'
 
     try:
-        count = await redis.incr(key)
-        if count == 1:
-            await redis.expire(key, settings.RATE_LIMIT_T)
-            ttl = settings.RATE_LIMIT_T
-        else:
-            ttl = await redis.ttl(key)
+        count, ttl = await redis.eval(
+            _RATE_LIMIT_INCR,
+            1,
+            key,
+            settings.RATE_LIMIT_T,
+        )
+        count = int(count)
+        ttl = int(ttl)
     except Exception as exc:  # noqa: BLE001
         logger.warning('Rate limit check failed for %s: %s', identifier, exc)
         return await call_next(request)
