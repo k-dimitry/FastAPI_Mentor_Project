@@ -98,6 +98,34 @@ class TestTasksFilteringAndOrdering:
             )
             assert task['is_done'] is True
 
+    async def test_created_from_and_created_to(
+        self, client: AsyncClient, user_token, twelve_tasks
+    ):
+        response = await client.get(
+            '/api/v1/tasks/',
+            headers={'Authorization': f'Bearer {user_token}'},
+            params={
+                'created_from': '2026-09-14T08:05:00+00:00',
+                'created_to': '2026-09-14T08:07:00+00:00',
+                'order_by': 'title',
+                'direction': 'asc',
+            },
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data['count'] == 3
+        assert [task['title'] for task in data['result']] == [
+            'Task 5',
+            'Task 6',
+            'Task 7',
+        ]
+        assert [task['id'] for task in data['result']] == [
+            str(twelve_tasks[5].id),
+            str(twelve_tasks[6].id),
+            str(twelve_tasks[7].id),
+        ]
+
 
 class TestTasksSearch:
     async def test_search_percent_is_literal(
@@ -133,3 +161,75 @@ class TestTasksSearch:
         data = response.json()
         assert data['count'] == 1
         assert data['result'][0]['title'] == 'a_b'
+
+    async def test_search_description(
+        self, client: AsyncClient, user_token, create_task_in_db, test_user
+    ):
+        await create_task_in_db(
+            user_id=test_user.id,
+            title='Plain',
+            description='hidden needle',
+        )
+        await create_task_in_db(
+            user_id=test_user.id, title='Other', description='nope'
+        )
+
+        response = await client.get(
+            '/api/v1/tasks/',
+            headers={'Authorization': f'Bearer {user_token}'},
+            params={'query': 'needle'},
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data['count'] == 1
+        assert data['result'][0]['title'] == 'Plain'
+
+
+class TestTasksOrderByUpdatedAt:
+    async def test_order_by_updated_at_desc(
+        self, client: AsyncClient, user_token, create_task_in_db, test_user
+    ):
+        await create_task_in_db(
+            user_id=test_user.id,
+            title='Older edit',
+            updated_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        )
+        await create_task_in_db(
+            user_id=test_user.id,
+            title='Newer edit',
+            updated_at=datetime(2026, 6, 1, tzinfo=timezone.utc),
+        )
+
+        response = await client.get(
+            '/api/v1/tasks/',
+            headers={'Authorization': f'Bearer {user_token}'},
+            params={'order_by': 'updated_at', 'direction': 'desc'},
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        titles = [task['title'] for task in response.json()['result']]
+        assert titles == ['Newer edit', 'Older edit']
+
+
+class TestTasksSortValidation:
+    @pytest.mark.parametrize(
+        'params,field',
+        [
+            ({'order_by': 'user_id'}, 'order_by'),
+            ({'direction': 'sideways'}, 'direction'),
+        ],
+    )
+    async def test_unknown_sort_is_rejected(
+        self, client: AsyncClient, user_token, params, field
+    ):
+        response = await client.get(
+            '/api/v1/tasks/',
+            headers={'Authorization': f'Bearer {user_token}'},
+            params=params,
+        )
+
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+        detail = response.json()['detail'][0]
+        assert detail['loc'] == ['query', field]
+        assert detail['type'] == 'literal_error'

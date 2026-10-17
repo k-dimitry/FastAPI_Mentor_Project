@@ -9,6 +9,7 @@ from sqlalchemy import select
 
 from api.v1.users.tests.conftest import CORRECT_PASSWORD
 from notifications.models import Notification
+from notifications.services import NotificationService
 from users.dto import UserCreateDTO, UserResponseDTO
 from users.models import User
 
@@ -461,3 +462,14 @@ class TestUserRegisterValidation:
         assert len(email) == 120
         assert response.status_code == status.HTTP_201_CREATED
         assert response.json()['email'] == email
+
+
+class TestWelcomeMissingUser:
+    async def test_send_welcome_skips_missing_user(self, db_session):
+        missing_id = uuid.uuid4()
+
+        assert NotificationService.send_welcome(missing_id) is None
+
+        db_session.expire_all()
+        result = await db_session.execute(select(Notification))
+        assert result.scalar_one_or_none() is None

@@ -1,11 +1,13 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 import time_machine
 from fastapi import status
 from httpx import AsyncClient
 
+from common.security import create_access_token
+from config import settings
 from tasks.dto import TaskCreateDTO, TaskResponseDTO, TaskUpdateDTO
 from tasks.exceptions import TaskAlreadyExistsError
 from tasks.models import Task
@@ -531,11 +533,154 @@ class TestTasksPatch:
         )
 
 
+class TestTasksGetById:
+    async def test_get_own_task(
+        self, client: AsyncClient, user_token, created_task
+    ):
+        response = await client.get(
+            f'/api/v1/tasks/{created_task.id}',
+            headers={'Authorization': f'Bearer {user_token}'},
+        )
+
+        assert response.status_code == status.HTTP_200_OK
+        data = response.json()
+        assert data['id'] == str(created_task.id)
+        assert data['title'] == created_task.title
+        assert data['description'] == created_task.description
+        assert data['is_done'] == created_task.is_done
+        assert datetime.fromisoformat(data['created_at']) == (
+            created_task.created_at
+        )
+        assert datetime.fromisoformat(data['updated_at']) == (
+            created_task.updated_at
+        )
+
+    async def test_get_other_users_task(
+        self,
+        client: AsyncClient,
+        user_token,
+        other_user,
+        create_task_in_db,
+    ):
+        foreign = await create_task_in_db(
+            user_id=other_user.id, title='Foreign'
+        )
+
+        response = await client.get(
+            f'/api/v1/tasks/{foreign.id}',
+            headers={'Authorization': f'Bearer {user_token}'},
+        )
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.json() == {'detail': 'Task not found'}
+
+    async def test_get_missing_task(
+        self, client: AsyncClient, user_token
+    ):
+        response = await client.get(
+            f'/api/v1/tasks/{uuid.uuid4()}',
+            headers={'Authorization': f'Bearer {user_token}'},
+        )
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.json() == {'detail': 'Task not found'}
+
+    async def test_get_invalid_uuid(
+        self, client: AsyncClient, user_token
+    ):
+        response = await client.get(
+            '/api/v1/tasks/not-a-uuid',
+            headers={'Authorization': f'Bearer {user_token}'},
+        )
+
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+        detail = response.json()['detail'][0]
+        assert detail['loc'] == ['path', 'task_id']
+        assert detail['type'] == 'uuid_parsing'
+
+    async def test_get_no_token(
+        self, client: AsyncClient, created_task
+    ):
+        response = await client.get(f'/api/v1/tasks/{created_task.id}')
+
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+        assert response.json() == {'detail': 'Not authenticated'}
+
+
+class TestTasksDelete:
+    async def test_delete_own_task(
+        self, client: AsyncClient, user_token, created_task, db_session
+    ):
+        task_id = created_task.id
+
+        response = await client.delete(
+            f'/api/v1/tasks/{task_id}',
+            headers={'Authorization': f'Bearer {user_token}'},
+        )
+
+        assert response.status_code == status.HTTP_204_NO_CONTENT
+        assert response.content == b''
+
+        db_session.expire_all()
+        assert await db_session.get(Task, task_id) is None
+
+    async def test_delete_other_users_task(
+        self,
+        client: AsyncClient,
+        user_token,
+        other_user,
+        create_task_in_db,
+        db_session,
+    ):
+        foreign = await create_task_in_db(
+            user_id=other_user.id, title='Keep me'
+        )
+        task_id = foreign.id
+
+        response = await client.delete(
+            f'/api/v1/tasks/{task_id}',
+            headers={'Authorization': f'Bearer {user_token}'},
+        )
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.json() == {'detail': 'Task not found'}
+
+        db_session.expire_all()
+        kept = await db_session.get(Task, task_id)
+        assert kept is not None
+        assert kept.title == 'Keep me'
+
+    async def test_delete_missing_task(
+        self, client: AsyncClient, user_token
+    ):
+        response = await client.delete(
+            f'/api/v1/tasks/{uuid.uuid4()}',
+            headers={'Authorization': f'Bearer {user_token}'},
+        )
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.json() == {'detail': 'Task not found'}
+
+    async def test_delete_invalid_uuid(
+        self, client: AsyncClient, user_token
+    ):
+        response = await client.delete(
+            '/api/v1/tasks/not-a-uuid',
+            headers={'Authorization': f'Bearer {user_token}'},
+        )
+
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+        detail = response.json()['detail'][0]
+        assert detail['loc'] == ['path', 'task_id']
+        assert detail['type'] == 'uuid_parsing'
+
+
 class TestTasksUnauthorized:
     @pytest.mark.parametrize(
         'method,path,json_body',
         [
             ('GET', '/api/v1/tasks/', None),
+            ('GET', f'/api/v1/tasks/{uuid.uuid4()}', None),
             ('POST', '/api/v1/tasks/', {'title': 'No auth'}),
             ('PATCH', f'/api/v1/tasks/{uuid.uuid4()}', {'title': 'No auth'}),
             ('DELETE', f'/api/v1/tasks/{uuid.uuid4()}', None),
@@ -552,3 +697,29 @@ class TestTasksUnauthorized:
 
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
         assert response.json() == {'detail': 'Not authenticated'}
+
+
+class TestTasksBadToken:
+    async def test_expired_token(self, client: AsyncClient, test_user):
+        token = create_access_token({'sub': str(test_user.id)})
+        later = datetime.now(timezone.utc) + timedelta(
+            minutes=settings.JWT_EXPIRE_MINUTES + 1
+        )
+
+        with time_machine.travel(later, tick=False):
+            response = await client.get(
+                '/api/v1/tasks/',
+                headers={'Authorization': f'Bearer {token}'},
+            )
+
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+        assert response.json() == {'detail': 'Invalid or expired token'}
+
+    async def test_malformed_token(self, client: AsyncClient):
+        response = await client.get(
+            '/api/v1/tasks/',
+            headers={'Authorization': 'Bearer not-a-jwt'},
+        )
+
+        assert response.status_code == status.HTTP_401_UNAUTHORIZED
+        assert response.json() == {'detail': 'Invalid or expired token'}

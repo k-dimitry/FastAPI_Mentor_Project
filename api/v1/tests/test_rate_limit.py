@@ -80,6 +80,11 @@ class TestRateLimit:
             r2 = await client.get('/')
             assert r1.status_code == status.HTTP_200_OK
             assert r2.status_code == status.HTTP_200_OK
+            assert r1.json() == {'status': 'ok'}
+            assert r2.json() == {
+                'message': 'FastAPI Mentor Project API',
+                'docs': '/docs',
+            }
 
         response = await client.get('/api/v1/tasks/')
         assert response.status_code == status.HTTP_401_UNAUTHORIZED

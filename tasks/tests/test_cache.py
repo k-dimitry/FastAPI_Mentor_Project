@@ -5,7 +5,12 @@ from uuid import UUID, uuid4
 from common.cache import Cache
 from config import settings
 from tasks.cache import TaskListCache
-from tasks.dto import TaskListDTO, TaskResponseDTO
+from tasks.dto import (
+    TaskCreateDTO,
+    TaskListDTO,
+    TaskResponseDTO,
+    TaskUpdateDTO,
+)
 from tasks.models import Task
 
 
@@ -262,3 +267,85 @@ class TestTaskServiceCache:
         result2 = await service.get_all_tasks(user_id=user.id)
         assert result2.total == 1
         assert result2.items[0].title == 't-1'
+
+    async def test_create_task_drops_owner_list_cache(
+        self, fake_redis, service, user, other_user, create_task_in_db
+    ):
+        await create_task_in_db(user_id=user.id, title='kept')
+        cached = await service.get_all_tasks(user_id=user.id)
+        assert cached.total == 1
+        other = await service.get_all_tasks(user_id=other_user.id)
+        assert other.total == 0
+        other_keys = await fake_redis.keys(f'task:list:{other_user.id}:*')
+        assert other_keys
+
+        await service.create_task(
+            TaskCreateDTO(title='added'), user_id=user.id
+        )
+
+        assert await fake_redis.keys(f'task:list:{user.id}:*') == []
+        assert (
+            await fake_redis.keys(f'task:list:{other_user.id}:*')
+            == other_keys
+        )
+
+        fresh = await service.get_all_tasks(user_id=user.id)
+        titles = {item.title for item in fresh.items}
+        assert titles == {'kept', 'added'}
+        still_other = await service.get_all_tasks(user_id=other_user.id)
+        assert still_other.total == 0
+
+    async def test_update_task_drops_owner_list_cache(
+        self, fake_redis, service, user, other_user
+    ):
+        created = await service.create_task(
+            TaskCreateDTO(title='before'), user_id=user.id
+        )
+        cached = await service.get_all_tasks(user_id=user.id)
+        assert cached.items[0].title == 'before'
+        await service.get_all_tasks(user_id=other_user.id)
+        other_keys = await fake_redis.keys(f'task:list:{other_user.id}:*')
+        assert other_keys
+
+        await service.update_task(
+            created.id, TaskUpdateDTO(title='after'), user_id=user.id
+        )
+
+        assert await fake_redis.keys(f'task:list:{user.id}:*') == []
+        assert (
+            await fake_redis.keys(f'task:list:{other_user.id}:*')
+            == other_keys
+        )
+
+        fresh = await service.get_all_tasks(user_id=user.id)
+        assert fresh.total == 1
+        assert fresh.items[0].title == 'after'
+        still_other = await service.get_all_tasks(user_id=other_user.id)
+        assert still_other.total == 0
+
+    async def test_delete_task_drops_owner_list_cache(
+        self, fake_redis, service, user, other_user, create_task_in_db
+    ):
+        first = await create_task_in_db(user_id=user.id, title='stay')
+        second = await create_task_in_db(user_id=user.id, title='gone')
+        cached = await service.get_all_tasks(user_id=user.id)
+        assert cached.total == 2
+        await service.get_all_tasks(user_id=other_user.id)
+        other_keys = await fake_redis.keys(f'task:list:{other_user.id}:*')
+        assert other_keys
+
+        deleted = await service.delete_task(second.id, user_id=user.id)
+        assert deleted is True
+
+        assert await fake_redis.keys(f'task:list:{user.id}:*') == []
+        assert (
+            await fake_redis.keys(f'task:list:{other_user.id}:*')
+            == other_keys
+        )
+
+        fresh = await service.get_all_tasks(user_id=user.id)
+        assert fresh.total == 1
+        assert fresh.items[0].id == first.id
+        assert fresh.items[0].title == 'stay'
+        still_other = await service.get_all_tasks(user_id=other_user.id)
+        assert still_other.total == 0

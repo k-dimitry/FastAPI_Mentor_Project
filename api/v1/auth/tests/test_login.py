@@ -126,3 +126,29 @@ class TestLoginFailure:
         mock_auth_service.authenticate_user.assert_called_once_with(
             'nonexistent', CORRECT_PASSWORD
         )
+
+
+class TestLoginValidation:
+    async def test_login_empty_body(
+        self, client: AsyncClient, mock_auth_service
+    ):
+        response = await client.post('/api/v1/auth/login', json={})
+
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+        mock_auth_service.authenticate_user.assert_not_called()
+
+    async def test_login_password_too_short(
+        self, client: AsyncClient, mock_auth_service
+    ):
+        response = await client.post(
+            '/api/v1/auth/login',
+            json={
+                'username_or_email': 'loginuser',
+                'password': 'short',
+            },
+        )
+
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+        detail = response.json()['detail'][0]
+        assert detail['loc'] == ['body', 'password']
+        mock_auth_service.authenticate_user.assert_not_called()
