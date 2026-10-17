@@ -132,31 +132,34 @@ async def rate_limit(request: Request, call_next):
 
 async def log_requests(request: Request, call_next):
     start_time = perf_counter()
+    log_bodies = logger.isEnabledFor(logging.DEBUG)
 
-    request_body = await request.body()
+    if log_bodies:
+        request_body = await request.body()
 
-    async def receive():
-        return {'type': 'http.request', 'body': request_body}
+        async def receive():
+            return {'type': 'http.request', 'body': request_body}
 
-    request._receive = receive
+        request._receive = receive
 
-    if request_body:
-        parsed = _safe_json_loads(request_body)
-        masked = _mask_sensitive_data(parsed)
-        logger.debug(f'Request body: {masked}')
+        if request_body:
+            parsed = _safe_json_loads(request_body)
+            masked = _mask_sensitive_data(parsed)
+            logger.debug(f'Request body: {masked}')
 
     response = await call_next(request)
 
     process_time = perf_counter() - start_time
 
-    response_body = [chunk async for chunk in response.body_iterator]
-    response.body_iterator = iterate_in_threadpool(iter(response_body))
+    if log_bodies:
+        response_body = [chunk async for chunk in response.body_iterator]
+        response.body_iterator = iterate_in_threadpool(iter(response_body))
 
-    if response_body:
-        combined = b''.join(response_body)
-        parsed = _safe_json_loads(combined)
-        masked = _mask_sensitive_data(parsed)
-        logger.debug(f'Response body: {masked}')
+        if response_body:
+            combined = b''.join(response_body)
+            parsed = _safe_json_loads(combined)
+            masked = _mask_sensitive_data(parsed)
+            logger.debug(f'Response body: {masked}')
 
     logger.info(
         f'{request.method} {request.url.path} - '
