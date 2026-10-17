@@ -12,6 +12,8 @@ from config import settings
 engine = create_async_engine(
     str(settings.DATABASE_URL),
     echo=settings.DATABASE_ECHO,
+    pool_pre_ping=True,
+    pool_recycle=3600,
 )
 
 AsyncSessionLocal = async_sessionmaker(
